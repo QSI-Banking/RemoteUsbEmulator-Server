@@ -66,7 +66,6 @@ static class VBoxUsb
         {
             file?.Dispose();
         }
-        throw new FileNotFoundException();
     }
 
     public static async Task<(WindowsDevice vboxDevice, DeviceFile deviceInterfaceFile)> ClaimDevice(BusId busId)

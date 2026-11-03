@@ -42,7 +42,9 @@ readonly record struct BusId
     /// The special value 0-0 for hubs that do not expose a compatible busid.
     /// NOTE: This is also the "default" value for this type.
     /// </summary>
+#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
     public static readonly BusId IncompatibleHub;
+#pragma warning restore CS0649 // Field is never assigned to, and will always have its default value
 
 #if !NETSTANDARD
     [JsonIgnore]
