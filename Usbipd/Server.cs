@@ -28,7 +28,8 @@ sealed partial class Server : BackgroundService
         {
             Logger.Debug($"usbipd:Port = {port}");
         }
-        TcpListener = TcpListener.Create(port);
+        // Clients reach the server only through the local TLS tunnel (stunnel), never directly.
+        TcpListener = new TcpListener(IPAddress.Loopback, port);
     }
 
     readonly ILogger Logger;
@@ -106,6 +107,13 @@ sealed partial class Server : BackgroundService
             if (clientAddress.IsIPv4MappedToIPv6)
             {
                 clientAddress = clientAddress.MapToIPv4();
+            }
+            if (!IPAddress.IsLoopback(clientAddress))
+            {
+                // Belt and braces: the listener is bound to loopback only.
+                Logger.ClientNotLoopback(clientAddress);
+                tcpClient.Dispose();
+                continue;
             }
             if (clientAddress.Equals(IPAddress.Loopback))
             {

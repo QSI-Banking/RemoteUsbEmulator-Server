@@ -17,6 +17,14 @@ sealed partial class ClientContext : IDisposable
     public IPAddress ClientAddress { get; set; } = IPAddress.Any;
     public BusId? AttachedBusId { get; set; }
     public DeviceFile? AttachedDevice { get; set; }
+    /// <summary>
+    /// User name that passed OP_REQ_AUTH on this connection, if any.
+    /// </summary>
+    public string? AuthenticatedUser { get; set; }
+    /// <summary>
+    /// Bind GUID of the only device this connection may import.
+    /// </summary>
+    public Guid? AuthorizedGuid { get; set; }
 
     void IDisposable.Dispose()
     {

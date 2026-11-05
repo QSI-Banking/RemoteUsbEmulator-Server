@@ -56,6 +56,8 @@ sealed partial class CommandHandlers : ICommandHandlers
             .ConfigureServices((hostContext, services) => _ = services
                 .AddHostedService<Server>()
                 .AddSingleton<PcapNg>()
+                .AddSingleton<IUserAuthenticator, HardcodedUserAuthenticator>()
+                .AddSingleton<IUserDeviceMap, RegistryUserDeviceMap>()
                 .AddScoped<ClientContext>()
                 .AddScoped<ConnectedClient>()
                 .AddScoped<AttachedClient>()

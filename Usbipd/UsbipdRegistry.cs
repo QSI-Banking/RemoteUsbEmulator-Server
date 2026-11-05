@@ -62,6 +62,8 @@ sealed class UsbipdRegistry : IDisposable
     const string PolicyName = "Policy";
     const string EffectName = "Effect";
     const string OperationName = "Operation";
+    const string UsersName = "Users";
+    const string DeviceGuidName = "DeviceGuid";
 
     /// <summary>
     /// <see langword="null"/> if not installed
@@ -282,6 +284,90 @@ sealed class UsbipdRegistry : IDisposable
     }
 
     public bool HasWriteAccess => WritableBaseKey is not null;
+
+    /// <summary>
+    /// Maps a user (see <see cref="UserNames"/>) to the bind GUID of the device that user may attach.
+    /// Stored as HKLM\SOFTWARE\usbipd-win\Users\&lt;name&gt;\DeviceGuid. Replaces any existing mapping.
+    /// </summary>
+    public void SetUserDevice(string userName, Guid deviceGuid)
+    {
+        if (!UserNames.IsValid(userName))
+        {
+            throw new ArgumentException("Invalid user name", nameof(userName));
+        }
+        using var usersKey = BaseKey(true).CreateSubKey(UsersName, true);
+        using var userKey = usersKey.CreateSubKey(userName, true);
+        userKey.SetValue(DeviceGuidName, deviceGuid.ToString("B"));
+    }
+
+    /// <returns><see langword="false"/> if the user did not exist.</returns>
+    public bool RemoveUser(string userName)
+    {
+        if (!UserNames.IsValid(userName))
+        {
+            return false;
+        }
+        using var usersKey = BaseKey(true).OpenSubKey(UsersName, true);
+        if (usersKey is null)
+        {
+            return false;
+        }
+        using (var userKey = usersKey.OpenSubKey(userName, false))
+        {
+            if (userKey is null)
+            {
+                return false;
+            }
+        }
+        usersKey.DeleteSubKeyTree(userName, false);
+        return true;
+    }
+
+    public void RemoveAllUsers()
+    {
+        using var usersKey = BaseKey(true).OpenSubKey(UsersName, true);
+        if (usersKey is null)
+        {
+            return;
+        }
+        foreach (var subKeyName in usersKey.GetSubKeyNames())
+        {
+            usersKey.DeleteSubKeyTree(subKeyName, false);
+        }
+    }
+
+    /// <returns>The bind GUID mapped to the user, or <see langword="null"/>.</returns>
+    public Guid? GetUserDevice(string userName)
+    {
+        if (!UserNames.IsValid(userName))
+        {
+            return null;
+        }
+        using var usersKey = BaseKey(false).OpenSubKey(UsersName, false);
+        using var userKey = usersKey?.OpenSubKey(userName, false);
+        return Guid.TryParseExact(userKey?.GetValue(DeviceGuidName) as string, "B", out var guid) ? guid : null;
+    }
+
+    /// <summary>
+    /// Enumerates all valid user mappings; invalid entries are ignored.
+    /// </summary>
+    public SortedDictionary<string, Guid> GetUserDevices()
+    {
+        var users = new SortedDictionary<string, Guid>(UserNames.Comparer);
+        using var usersKey = BaseKey(false).OpenSubKey(UsersName, false);
+        if (usersKey is null)
+        {
+            return users;
+        }
+        foreach (var userName in usersKey.GetSubKeyNames())
+        {
+            if (GetUserDevice(userName) is Guid guid)
+            {
+                users[userName] = guid;
+            }
+        }
+        return users;
+    }
 
     public Guid AddPolicyRule(PolicyRule rule)
     {

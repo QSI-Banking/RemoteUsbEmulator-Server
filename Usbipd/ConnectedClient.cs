@@ -20,11 +20,14 @@ using static Usbipd.Interop.UsbIp;
 
 namespace Usbipd;
 
-sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clientContext, IServiceProvider serviceProvider)
+sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clientContext, IServiceProvider serviceProvider,
+    IUserAuthenticator userAuthenticator, IUserDeviceMap userDeviceMap)
 {
     readonly ILogger Logger = logger;
     readonly ClientContext ClientContext = clientContext;
     readonly IServiceProvider ServiceProvider = serviceProvider;
+    readonly IUserAuthenticator UserAuthenticator = userAuthenticator;
+    readonly IUserDeviceMap UserDeviceMap = userDeviceMap;
     readonly NetworkStream Stream = clientContext.TcpClient.GetStream();
 
     public async Task RunAsync(CancellationToken cancellationToken)
@@ -38,14 +41,37 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
             }
             switch (opCode)
             {
+                case OpCode.OP_REQ_AUTH:
+                    // Authenticate, then exactly one OP_REQ_IMPORT for the user's device.
+                    if (!await HandleRequestAuthAsync(cancellationToken))
+                    {
+                        return;
+                    }
+                    opCode = await ReceiveOpCodeAsync(cancellationToken);
+                    if (Logger.IsEnabled(LogLevel.Debug))
+                    {
+                        Logger.Debug($"Received opcode: {opCode}");
+                    }
+                    if (opCode != OpCode.OP_REQ_IMPORT)
+                    {
+                        throw new ProtocolViolationException($"unexpected opcode {opCode} after authentication");
+                    }
+                    await HandleRequestImportAsync(cancellationToken);
+                    break;
                 case OpCode.OP_REQ_DEVLIST:
-                    await HandleRequestDeviceListAsync(cancellationToken);
+                    // Device enumeration is disabled: clients attach by user name only.
+                    Logger.ClientNotAuthenticated(ClientContext.ClientAddress, opCode.ToString());
+                    await SendOpCodeAsync(OpCode.OP_REP_DEVLIST, Status.ST_NA);
                     break;
                 case OpCode.OP_REQ_IMPORT:
-                    await HandleRequestImportAsync(cancellationToken);
+                    // Import without prior authentication: consume the busid and refuse.
+                    await Stream.ReadMessageAsync(new byte[SYSFS_BUS_ID_SIZE], cancellationToken);
+                    Logger.ClientNotAuthenticated(ClientContext.ClientAddress, opCode.ToString());
+                    await SendOpCodeAsync(OpCode.OP_REP_IMPORT, Status.ST_NA);
                     break;
                 case OpCode.OP_REP_DEVLIST:
                 case OpCode.OP_REP_IMPORT:
+                case OpCode.OP_REP_AUTH:
                 default:
                     throw new ProtocolViolationException($"unexpected opcode {opCode}");
             }
@@ -62,53 +88,69 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
         }
     }
 
-    static IEnumerable<Device> GetDevicesAvailableForClient(IPAddress ipAddress)
+    /// <summary>
+    /// Reads one length-prefixed (u8) UTF-8 string. The payload is always consumed, so the stream stays in sync.
+    /// </summary>
+    /// <returns><see langword="null"/> if the string is empty, too long, or not valid UTF-8.</returns>
+    async Task<string?> ReceiveLengthPrefixedStringAsync(int maxLength, CancellationToken cancellationToken)
     {
-        return DeviceExtensions.GetAll().Where(device =>
+        var length = new byte[1];
+        await Stream.ReadMessageAsync(length, cancellationToken);
+        var buf = new byte[length[0]];
+        await Stream.ReadMessageAsync(buf, cancellationToken);
+        if (buf.Length == 0 || buf.Length > maxLength)
         {
-            if (!device.BusId.HasValue)
-            {
-                // The device is not currently plugged in.
-                return false;
-            }
-            if (device.BusId.Value.IsIncompatibleHub)
-            {
-                // The hub the device is plugged into is incompatible.
-                return false;
-            }
-            if (device.PersistedGuid.HasValue)
-            {
-                // Device is already bound, so available for attach.
-                return true;
-            }
-            return Policy.IsAutoBindAllowed(device, ipAddress);
-        });
+            return null;
+        }
+        try
+        {
+            return StrictUtf8.GetString(buf);
+        }
+        catch (DecoderFallbackException)
+        {
+            return null;
+        }
     }
 
-    async Task HandleRequestDeviceListAsync(CancellationToken cancellationToken)
+    static readonly UTF8Encoding StrictUtf8 = new(false, true);
+
+    /// <summary>
+    /// Request: u8 user_len, user, u8 otp_len, otp.
+    /// Reply: OP_REP_AUTH + status; on ST_OK followed by char busid[SYSFS_BUS_ID_SIZE] of the user's device.
+    /// </summary>
+    /// <returns><see langword="true"/> if the client may continue with OP_REQ_IMPORT.</returns>
+    async Task<bool> HandleRequestAuthAsync(CancellationToken cancellationToken)
     {
-        var exportedDevices = new List<ExportedDevice>();
-        foreach (var device in GetDevicesAvailableForClient(ClientContext.ClientAddress))
+        var userName = await ReceiveLengthPrefixedStringAsync(USBIP_MAX_USER, cancellationToken);
+        var otp = await ReceiveLengthPrefixedStringAsync(USBIP_MAX_OTP, cancellationToken);
+
+        // Never log the one-time password; log the user name only if it is well-formed.
+        if (userName is null || otp is null || !UserNames.IsValid(userName) || !UserAuthenticator.Authenticate(userName, otp))
         {
-            try
-            {
-                exportedDevices.Add(await ExportedDevice.GetExportedDevice(device, cancellationToken));
-            }
-            catch (ConfigurationManagerException) { }
-            catch (Win32Exception) { }
+            Logger.ClientAuthenticationFailed(ClientContext.ClientAddress, UserNames.IsValid(userName) ? userName : "<invalid>");
+            await SendOpCodeAsync(OpCode.OP_REP_AUTH, Status.ST_AUTH_FAILED);
+            return false;
         }
 
-        await SendOpCodeAsync(OpCode.OP_REP_DEVLIST, Status.ST_OK);
+        var guid = UserDeviceMap.GetDeviceGuid(userName);
+        var device = guid.HasValue ? UsbipdRegistry.Instance.GetBoundDevices().SingleOrDefault(d => d.PersistedGuid == guid.Value) : null;
+        if (device is null || !device.BusId.HasValue || device.BusId.Value.IsIncompatibleHub)
+        {
+            // Not mapped, bind removed, unplugged, or on an incompatible hub.
+            Logger.ClientNoDeviceForUser(ClientContext.ClientAddress, userName, guid);
+            await SendOpCodeAsync(OpCode.OP_REP_AUTH, Status.ST_NODEV);
+            return false;
+        }
 
-        // reply count
-        var buf = new byte[4];
-        BinaryPrimitives.WriteUInt32BigEndian(buf, (uint)exportedDevices.Count);
+        ClientContext.AuthenticatedUser = userName;
+        ClientContext.AuthorizedGuid = guid;
+        Logger.ClientAuthenticated(ClientContext.ClientAddress, userName, device.BusId.Value);
+
+        await SendOpCodeAsync(OpCode.OP_REP_AUTH, Status.ST_OK);
+        var buf = new byte[SYSFS_BUS_ID_SIZE];
+        _ = Encoding.UTF8.GetBytes(device.BusId.Value.ToString(), buf);
         await Stream.WriteAsync(buf, cancellationToken);
-
-        foreach (var exportedDevice in exportedDevices)
-        {
-            exportedDevice.Serialize(Stream, true);
-        }
+        return true;
     }
 
     async Task HandleRequestImportAsync(CancellationToken cancellationToken)
@@ -130,25 +172,11 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
         VBoxUsbMon? mon = null;
         try
         {
-            {
-                // Auto-bind if necessary *and* allowed.
-                var bindDevice = GetDevicesAvailableForClient(ClientContext.ClientAddress).SingleOrDefault(d => d.BusId.HasValue && d.BusId.Value == busId);
-                if (bindDevice is null)
-                {
-                    await SendOpCodeAsync(OpCode.OP_REP_IMPORT, Status.ST_NODEV);
-                    return;
-                }
-                if (!bindDevice.PersistedGuid.HasValue)
-                {
-                    // The device is not currently bound, but it is allowed by the policy. Auto-bind it now...
-                    Logger.AutoBind(ClientContext.ClientAddress, busId, bindDevice.InstanceId);
-                    UsbipdRegistry.Instance.Persist(bindDevice.InstanceId, bindDevice.Description);
-                }
-            }
-
+            // Only the device mapped to the authenticated user may be imported (no policy auto-bind).
             var device = UsbipdRegistry.Instance.GetBoundDevices().SingleOrDefault(d => d.BusId.HasValue && d.BusId.Value == busId);
-            if (device is null)
+            if (ClientContext.AuthenticatedUser is null || device is null || device.PersistedGuid != ClientContext.AuthorizedGuid)
             {
+                Logger.ClientImportRefused(ClientContext.ClientAddress, ClientContext.AuthenticatedUser ?? string.Empty, busId);
                 await SendOpCodeAsync(OpCode.OP_REP_IMPORT, Status.ST_NODEV);
                 return;
             }

@@ -30,6 +30,10 @@ interface ICommandHandlers
     Task<ExitCode> Unbind(Guid guid, IConsole console, CancellationToken cancellationToken);
     Task<ExitCode> Unbind(VidPid vidPid, IConsole console, CancellationToken cancellationToken);
     Task<ExitCode> UnbindAll(IConsole console, CancellationToken cancellationToken);
+    Task<ExitCode> UserAdd(string userName, Guid? guid, BusId? busId, bool force, IConsole console, CancellationToken cancellationToken);
+    Task<ExitCode> UserList(IConsole console, CancellationToken cancellationToken);
+    Task<ExitCode> UserRemove(string userName, IConsole console, CancellationToken cancellationToken);
+    Task<ExitCode> UserRemoveAll(IConsole console, CancellationToken cancellationToken);
 
     // Server
     Task<ExitCode> Server(string[] args, IConsole console, CancellationToken cancellationToken);

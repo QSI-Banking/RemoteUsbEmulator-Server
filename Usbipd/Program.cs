@@ -48,6 +48,16 @@ static class Program
         return guid;
     }
 
+    static string ParseUserName(ArgumentResult argumentResult)
+    {
+        var value = argumentResult.Tokens[0].Value;
+        if (!UserNames.IsValid(value))
+        {
+            argumentResult.AddError($"Invalid user name '{value}'; use {UserNames.RulesText}.");
+        }
+        return value;
+    }
+
     static VidPid ParseVidPid(ArgumentResult argumentResult)
     {
         if (!VidPid.TryParse(argumentResult.Tokens[0].Value, out var vidPid))
@@ -731,6 +741,134 @@ static class Program
                             : await commandHandlers.Unbind(parseResult.GetRequiredValue(hardwareIdOption), console, cancellationToken)
             ));
             rootCommand.Subcommands.Add(unbindCommand);
+        }
+        {
+            //
+            //  user
+            //
+            var userCommand = new Command("user", "Manage users\0" +
+                "Users attach the one device mapped to them by authenticating with a user name and one-time password.");
+            {
+                //
+                //  user add --name <NAME>
+                //
+                var nameOption = new Option<string>("--name", "-n")
+                {
+                    Description = "User name",
+                    HelpName = "NAME",
+                    Required = true,
+                    CustomParser = ParseUserName,
+                };
+                //
+                //  user add [--busid <BUSID>]
+                //
+                var busIdOption = new Option<BusId>("--busid", "-b")
+                {
+                    Description = "Map the user to the shared device having <BUSID>",
+                    // NOTE: By specifying HelpName, the help text will *not* include the completion hints (which could be empty, or a really long list).
+                    HelpName = "BUSID",
+                    CustomParser = ParseCompatibleBusId,
+                };
+                busIdOption.CompletionSources.Add(completionContext => CompletionGuard(completionContext, () =>
+                    UsbipdRegistry.Instance.GetBoundDevices().Where(d => d.BusId.HasValue)
+                    .Select(d => new CompletionItem(d.BusId.GetValueOrDefault().ToString()))));
+                //
+                //  user add [--guid <GUID>]
+                //
+                var guidOption = new Option<Guid>("--guid", "-g")
+                {
+                    Description = "Map the user to the shared device having bind <GUID>",
+                    // NOTE: By specifying HelpName, the help text will *not* include the completion hints (which could be empty, or a really long list).
+                    HelpName = "GUID",
+                    CustomParser = ParseGuid,
+                };
+                guidOption.CompletionSources.Add(completionContext => CompletionGuard(completionContext, () =>
+                    UsbipdRegistry.Instance.GetBoundDevices()
+                    .Select(d => new CompletionItem(d.PersistedGuid.GetValueOrDefault().ToString("D")))));
+                //
+                //  user add [--force]
+                //
+                var forceOption = new Option<bool>("--force", "-f")
+                {
+                    Description = "Replace an existing mapping for the user",
+                    Arity = ArgumentArity.Zero,
+                };
+                //
+                //  user add
+                //
+                var addCommand = new Command("add", "Map a user to a device\0" + $"""
+                    Maps a user to one shared device. The device must already be shared with 'usbipd bind'. \
+                    The mapping is persistent and effective immediately.
+
+                    {OneOfRequiredText(busIdOption, guidOption)}
+                    """.Unwrap())
+                {
+                    nameOption,
+                    busIdOption,
+                    guidOption,
+                    forceOption,
+                };
+                addCommand.Validators.Add(commandResult => ValidateOneOf(commandResult, busIdOption, guidOption));
+                addCommand.SetAction(async (parseResult, cancellationToken) => (int)
+                    await commandHandlers.UserAdd(parseResult.GetRequiredValue(nameOption),
+                        parseResult.GetResult(guidOption)?.GetRequiredValue(guidOption),
+                        parseResult.GetResult(busIdOption)?.GetRequiredValue(busIdOption),
+                        parseResult.GetValue(forceOption), console, cancellationToken)
+                );
+                userCommand.Subcommands.Add(addCommand);
+            }
+            {
+                //
+                //  user list
+                //
+                var listCommand = new Command("list", "List users\0" +
+                    "List all users and the device mapped to each.");
+                listCommand.SetAction(async (parseResult, cancellationToken) => (int)
+                    await commandHandlers.UserList(console, cancellationToken)
+                );
+                userCommand.Subcommands.Add(listCommand);
+            }
+            {
+                //
+                //  user remove [--all]
+                //
+                var allOption = new Option<bool>("--all", "-a")
+                {
+                    Description = "Remove all users",
+                    Arity = ArgumentArity.Zero,
+                };
+                //
+                //  user remove [--name <NAME>]
+                //
+                var nameOption = new Option<string>("--name", "-n")
+                {
+                    Description = "Remove the user having <NAME>",
+                    HelpName = "NAME",
+                    CustomParser = ParseUserName,
+                };
+                nameOption.CompletionSources.Add(completionContext => CompletionGuard(completionContext, () =>
+                    UsbipdRegistry.Instance.GetUserDevices().Keys.Select(n => new CompletionItem(n))));
+                //
+                //  user remove
+                //
+                var removeCommand = new Command("remove", "Remove a user\0" + $"""
+                    Removes user mappings. The shared device itself is not affected.
+
+                    {OneOfRequiredText(allOption, nameOption)}
+                    """)
+                {
+                    allOption,
+                    nameOption,
+                };
+                removeCommand.Validators.Add(commandResult => ValidateOneOf(commandResult, allOption, nameOption));
+                removeCommand.SetAction(async (parseResult, cancellationToken) => (int)(
+                    parseResult.GetValue(allOption)
+                        ? await commandHandlers.UserRemoveAll(console, cancellationToken)
+                        : await commandHandlers.UserRemove(parseResult.GetRequiredValue(nameOption), console, cancellationToken)
+                ));
+                userCommand.Subcommands.Add(removeCommand);
+            }
+            rootCommand.Subcommands.Add(userCommand);
         }
         {
             //

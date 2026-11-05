@@ -267,4 +267,75 @@ sealed class UsbipdRegistry_Tests
             _ = UsbipdRegistry.Instance.GetPolicyRules();
         });
     }
+
+    static readonly Guid TestDeviceGuid = Guid.Parse("{B60EDA76-B612-4337-8270-FB97E53F8376}");
+    static readonly Guid OtherDeviceGuid = Guid.Parse("{E863A2AF-AE47-440B-A32B-FAB1C03017AB}");
+
+    [TestMethod]
+    public void UserDevice_NoUsersKey()
+    {
+        Assert.IsNull(UsbipdRegistry.Instance.GetUserDevice("qsi-test"));
+        Assert.IsEmpty(UsbipdRegistry.Instance.GetUserDevices());
+        Assert.IsFalse(UsbipdRegistry.Instance.RemoveUser("qsi-test"));
+        UsbipdRegistry.Instance.RemoveAllUsers();
+    }
+
+    [TestMethod]
+    public void UserDevice_SetGetCaseInsensitive()
+    {
+        UsbipdRegistry.Instance.SetUserDevice("qsi-test", TestDeviceGuid);
+        Assert.AreEqual(TestDeviceGuid, UsbipdRegistry.Instance.GetUserDevice("qsi-test"));
+        Assert.AreEqual(TestDeviceGuid, UsbipdRegistry.Instance.GetUserDevice("QSI-Test"));
+    }
+
+    [TestMethod]
+    public void UserDevice_Replace()
+    {
+        UsbipdRegistry.Instance.SetUserDevice("qsi-test", TestDeviceGuid);
+        UsbipdRegistry.Instance.SetUserDevice("qsi-test", OtherDeviceGuid);
+        Assert.AreEqual(OtherDeviceGuid, UsbipdRegistry.Instance.GetUserDevice("qsi-test"));
+        Assert.HasCount(1, UsbipdRegistry.Instance.GetUserDevices());
+    }
+
+    [TestMethod]
+    public void UserDevice_Remove()
+    {
+        UsbipdRegistry.Instance.SetUserDevice("alice", TestDeviceGuid);
+        UsbipdRegistry.Instance.SetUserDevice("bob", TestDeviceGuid);
+        Assert.IsTrue(UsbipdRegistry.Instance.RemoveUser("alice"));
+        Assert.IsFalse(UsbipdRegistry.Instance.RemoveUser("alice"));
+        Assert.IsNull(UsbipdRegistry.Instance.GetUserDevice("alice"));
+        Assert.AreEqual(TestDeviceGuid, UsbipdRegistry.Instance.GetUserDevice("bob"));
+    }
+
+    [TestMethod]
+    public void UserDevice_RemoveAll()
+    {
+        UsbipdRegistry.Instance.SetUserDevice("alice", TestDeviceGuid);
+        UsbipdRegistry.Instance.SetUserDevice("bob", OtherDeviceGuid);
+        Assert.HasCount(2, UsbipdRegistry.Instance.GetUserDevices());
+        UsbipdRegistry.Instance.RemoveAllUsers();
+        Assert.IsEmpty(UsbipdRegistry.Instance.GetUserDevices());
+    }
+
+    [TestMethod]
+    public void UserDevice_InvalidName()
+    {
+        Assert.ThrowsExactly<ArgumentException>(() =>
+        {
+            UsbipdRegistry.Instance.SetUserDevice("bad name", TestDeviceGuid);
+        });
+        Assert.IsNull(UsbipdRegistry.Instance.GetUserDevice("bad name"));
+    }
+
+    [TestMethod]
+    public void UserDevice_InvalidGuidIgnored()
+    {
+        using (var userKey = TestRegistry.CreateSubKey(@"SOFTWARE\usbipd-win\Users\broken"))
+        {
+            userKey.SetValue("DeviceGuid", "not-a-guid");
+        }
+        Assert.IsNull(UsbipdRegistry.Instance.GetUserDevice("broken"));
+        Assert.IsEmpty(UsbipdRegistry.Instance.GetUserDevices());
+    }
 }

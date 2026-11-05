@@ -24,6 +24,24 @@ static partial class LogEvents
     [LoggerMessage(5, LogLevel.Information, "Auto-bind of device at {busId} ({instanceId}) by client {clientAddress}.")]
     public static partial void AutoBind(this ILogger logger, IPAddress clientAddress, BusId busId, string instanceId);
 
+    [LoggerMessage(6, LogLevel.Information, "Client {clientAddress} authenticated as user '{userName}'; device at {busId}.")]
+    public static partial void ClientAuthenticated(this ILogger logger, IPAddress clientAddress, string userName, BusId busId);
+
+    [LoggerMessage(7, LogLevel.Warning, "Client {clientAddress} failed to authenticate as user '{userName}'.")]
+    public static partial void ClientAuthenticationFailed(this ILogger logger, IPAddress clientAddress, string userName);
+
+    [LoggerMessage(8, LogLevel.Warning, "Client {clientAddress} authenticated as user '{userName}', but no device is available for that user (guid '{deviceGuid}').")]
+    public static partial void ClientNoDeviceForUser(this ILogger logger, IPAddress clientAddress, string userName, Guid? deviceGuid);
+
+    [LoggerMessage(9, LogLevel.Warning, "Client {clientAddress} sent {opCode} without authentication; refused.")]
+    public static partial void ClientNotAuthenticated(this ILogger logger, IPAddress clientAddress, string opCode);
+
+    [LoggerMessage(10, LogLevel.Warning, "Client {clientAddress} (user '{userName}') requested device at {busId}, which is not mapped to that user; refused.")]
+    public static partial void ClientImportRefused(this ILogger logger, IPAddress clientAddress, string userName, BusId busId);
+
+    [LoggerMessage(11, LogLevel.Warning, "Connection from non-loopback address {clientAddress} refused.")]
+    public static partial void ClientNotLoopback(this ILogger logger, IPAddress clientAddress);
+
     [LoggerMessage(1000, LogLevel.Debug, "{text}")]
     public static partial void Debug(this ILogger logger, string text);
 

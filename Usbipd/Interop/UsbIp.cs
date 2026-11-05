@@ -28,6 +28,12 @@ static class UsbIp
     /// <summary>UsbIp: tools/usbip_network.c: usbip_port</summary>
     public const ushort USBIP_PORT = 3240;
 
+    /// <summary>Maximum user name length in OP_REQ_AUTH.</summary>
+    public const int USBIP_MAX_USER = 63;
+
+    /// <summary>Maximum one-time password length in OP_REQ_AUTH.</summary>
+    public const int USBIP_MAX_OTP = 15;
+
     internal enum OpCode : ushort
     {
         /// <summary>UsbIp: tools/usbip_network.h</summary>
@@ -39,6 +45,11 @@ static class UsbIp
         OP_REQ_IMPORT = 0x8003,
         /// <summary>UsbIp: tools/usbip_network.h</summary>
         OP_REP_IMPORT = 0x0003,
+
+        /// <summary>User name + one-time password.</summary>
+        OP_REQ_AUTH = 0x8010,
+        /// <summary>On ST_OK followed by the busid of the user's device.</summary>
+        OP_REP_AUTH = 0x0010,
     }
 
     internal enum Status : uint
@@ -60,7 +71,10 @@ static class UsbIp
         ST_NODEV,
         /// <summary>UsbIp: tools/usbip_common.h
         /// <para>Unexpected response</para></summary>
-        ST_ERROR
+        ST_ERROR,
+
+        /// <summary>OP_REQ_AUTH rejected (unknown user or wrong one-time password).</summary>
+        ST_AUTH_FAILED,
     }
 
     internal enum UsbIpCmd : uint
