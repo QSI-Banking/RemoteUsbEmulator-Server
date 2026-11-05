@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 QSI-Banking
+
+SPDX-License-Identifier: GPL-3.0-only
+-->
+<!--
+DEVELOPMENT ONLY: sets up stunnel as a mutual-TLS front end for usbipd (TCP 3241 -> 127.0.0.1:3240),
+using the shared development certificates in DevTls\. See DevTls\README.md.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+    <Fragment>
+        <ComponentGroup Id="DevTls" Directory="APPLICATIONFOLDER" Subdirectory="dev-tls">
+            <File Id="DevTls_Setup_UsbipTunnel.ps1" Name="Setup-UsbipTunnel.ps1" Source="$(sys.SOURCEFILEDIR)DevTls\Setup-UsbipTunnel.ps1" />
+            <File Id="DevTls_README.md" Name="README.md" Source="$(sys.SOURCEFILEDIR)DevTls\README.md" />
+            <File Id="DevTls_ca.crt" Name="ca.crt" Source="$(sys.SOURCEFILEDIR)DevTls\ca.crt" />
+            <File Id="DevTls_server.crt" Name="server.crt" Source="$(sys.SOURCEFILEDIR)DevTls\server.crt" />
+            <File Id="DevTls_server.key" Name="server.key" Source="$(sys.SOURCEFILEDIR)DevTls\server.key" />
+        </ComponentGroup>
+
+        <!-- will be (or remains) installed -->
+        <?define DevTlsInstall="(NOT UPGRADINGPRODUCTCODE) AND (($DevTls_Setup_UsbipTunnel.ps1=3) OR WIX_UPGRADE_DETECTED)" ?>
+        <!-- currently installed and will be uninstalled -->
+        <?define DevTlsUninstall="(NOT UPGRADINGPRODUCTCODE) AND ((?DevTls_Setup_UsbipTunnel.ps1=3) AND ($DevTls_Setup_UsbipTunnel.ps1=2))" ?>
+
+        <!-- Installs stunnel if missing (download from stunnel.org), writes its config, starts the service, opens TCP 3241. -->
+        <SetProperty
+            Id="ConfigureDevTls"
+            Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;[#DevTls_Setup_UsbipTunnel.ps1]&quot; -Role Server"
+            Sequence="execute" Before="ConfigureDevTls" Condition="$(var.DevTlsInstall)"
+            />
+        <CustomAction Id="ConfigureDevTls" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixQuietExec" Return="check" Impersonate="no" Execute="deferred" />
+
+        <!-- Removes the stunnel service, its usbip config and the firewall rule (best effort); stunnel itself stays installed. -->
+        <SetProperty
+            Id="RemoveDevTls"
+            Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;[#DevTls_Setup_UsbipTunnel.ps1]&quot; -Role Server -Uninstall"
+            Sequence="execute" Before="RemoveDevTls" Condition="$(var.DevTlsUninstall)"
+            />
+        <CustomAction Id="RemoveDevTls" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixQuietExec" Return="ignore" Impersonate="no" Execute="deferred" />
+
+        <InstallExecuteSequence>
+            <Custom Action="ConfigureDevTls" After="StartServices" Condition="$(var.DevTlsInstall)" />
+            <Custom Action="RemoveDevTls" Before="RemoveFiles" Condition="$(var.DevTlsUninstall)" />
+        </InstallExecuteSequence>
+    </Fragment>
+</Wix>
