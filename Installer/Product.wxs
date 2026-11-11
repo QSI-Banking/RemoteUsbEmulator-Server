@@ -119,8 +119,6 @@ SPDX-License-Identifier: GPL-3.0-only
             >
             <ComponentGroupRef Id="usbipd" />
             <ComponentGroupRef Id="UsbIds" />
-            <!-- DEVELOPMENT ONLY: stunnel mutual-TLS front end with shared development certificates. -->
-            <ComponentGroupRef Id="DevTls" />
             <Feature
                 Id="Drivers"
                 Level="1"

@@ -39,8 +39,20 @@ static partial class LogEvents
     [LoggerMessage(10, LogLevel.Warning, "Client {clientAddress} (user '{userName}') requested device at {busId}, which is not mapped to that user; refused.")]
     public static partial void ClientImportRefused(this ILogger logger, IPAddress clientAddress, string userName, BusId busId);
 
-    [LoggerMessage(11, LogLevel.Warning, "Connection from non-loopback address {clientAddress} refused.")]
-    public static partial void ClientNotLoopback(this ILogger logger, IPAddress clientAddress);
+    [LoggerMessage(11, LogLevel.Warning, "TLS handshake with client {clientAddress} failed: {reason}")]
+    public static partial void ClientTlsFailed(this ILogger logger, IPAddress clientAddress, string reason);
+
+    [LoggerMessage(12, LogLevel.Information, "Client {clientAddress} connected with certificate '{subject}' ({thumbprint}).")]
+    public static partial void ClientTlsAuthenticated(this ILogger logger, IPAddress clientAddress, string subject, string thumbprint);
+
+    [LoggerMessage(13, LogLevel.Warning, "Client certificate '{subject}' ({thumbprint}) rejected: {reason}.")]
+    public static partial void ClientCertificateRejected(this ILogger logger, string subject, string thumbprint, string reason);
+
+    [LoggerMessage(14, LogLevel.Information, "Listening for TLS connections on {endPoint} with server certificate '{subject}' ({thumbprint}), valid until {notAfter}.")]
+    public static partial void TlsListening(this ILogger logger, string endPoint, string subject, string thumbprint, DateTime notAfter);
+
+    [LoggerMessage(15, LogLevel.Critical, "TLS configuration error: {text}")]
+    public static partial void TlsConfigurationError(this ILogger logger, string text);
 
     [LoggerMessage(1000, LogLevel.Debug, "{text}")]
     public static partial void Debug(this ILogger logger, string text);

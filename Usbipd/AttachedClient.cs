@@ -21,17 +21,15 @@ sealed class AttachedClient
         Pcap = pcap;
         BusId = (BusId)clientContext.AttachedBusId!;
 
-        var tcpClient = clientContext.TcpClient;
-        Stream = tcpClient.GetStream();
-
-        tcpClient.NoDelay = true;
+        Stream = clientContext.Stream;
+        clientContext.TcpClient.NoDelay = true;
     }
 
     readonly ILoggerFactory LoggerFactory;
     readonly ClientContext ClientContext;
     readonly PcapNg Pcap;
     readonly BusId BusId;
-    readonly NetworkStream Stream;
+    readonly Stream Stream;
     readonly Channel<RequestReply> ReplyChannel = Channel.CreateUnbounded<RequestReply>();
 
     readonly Dictionary<byte, AttachedEndpoint> AttachedEndpoints = [];

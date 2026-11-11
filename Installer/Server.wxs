@@ -18,14 +18,15 @@ SPDX-License-Identifier: GPL-3.0-only
             -->
             <Component Id="usbipd.exe">
                 <File Id="usbipd.exe" Name="usbipd.exe">
+                    <!-- Mutual TLS only: clients without a trusted certificate are rejected by usbipd itself. -->
                     <fw:FirewallException
                         Id="usbipd"
                         Name="usbipd"
                         Protocol="tcp"
-                        Port="3240"
+                        Port="3241"
                         Profile="all"
-                        Scope="localSubnet"
-                        Description="Allow computers on local subnets to access the USBIP Device Host service."
+                        Scope="any"
+                        Description="Allow USB/IP clients to reach the USBIP Device Host service over mutual TLS."
                     />
                 </File>
                 <ServiceInstall
@@ -92,6 +93,13 @@ SPDX-License-Identifier: GPL-3.0-only
 
             <Component Id="COPYING.md">
                 <File Id="COPYING.md" Name="COPYING.md" />
+            </Component>
+
+            <!--
+            Holds the TLS settings. Edited after installation, so never overwritten and kept on uninstall and upgrade.
+            -->
+            <Component Id="appsettings.json" NeverOverwrite="yes" Permanent="yes">
+                <File Id="appsettings.json" Name="appsettings.json" />
             </Component>
 
             <Component Id="EventManifest.xml">
@@ -203,6 +211,7 @@ SPDX-License-Identifier: GPL-3.0-only
     <Fragment>
         <ComponentGroup Id="usbipd">
             <ComponentRef Id="COPYING.md" />
+            <ComponentRef Id="appsettings.json" />
             <ComponentRef Id="usbipd.exe" />
             <ComponentRef Id="EventManifest.xml" />
         </ComponentGroup>

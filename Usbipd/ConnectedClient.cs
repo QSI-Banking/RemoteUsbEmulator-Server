@@ -28,7 +28,7 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
     readonly IServiceProvider ServiceProvider = serviceProvider;
     readonly IUserAuthenticator UserAuthenticator = userAuthenticator;
     readonly IUserDeviceMap UserDeviceMap = userDeviceMap;
-    readonly NetworkStream Stream = clientContext.TcpClient.GetStream();
+    readonly Stream Stream = clientContext.Stream;
 
     public async Task RunAsync(CancellationToken cancellationToken)
     {

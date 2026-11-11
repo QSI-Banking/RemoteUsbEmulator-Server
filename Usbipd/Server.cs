@@ -3,11 +3,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.Net;
+using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Authentication;
 using Windows.Win32;
 using Windows.Win32.Security;
-
-using static Usbipd.Interop.UsbIp;
 
 namespace Usbipd;
 
@@ -20,26 +20,18 @@ sealed partial class Server : BackgroundService
         Logger = logger;
         Configuration = config;
         ServiceScopeFactory = serviceScopeFactory;
-        if (!ushort.TryParse(Configuration["usbipd:Port"], out var port))
-        {
-            port = USBIP_PORT;
-        }
-        if (Logger.IsEnabled(LogLevel.Debug))
-        {
-            Logger.Debug($"usbipd:Port = {port}");
-        }
-        // Clients reach the server only through the local TLS tunnel (stunnel), never directly.
-        TcpListener = new TcpListener(IPAddress.Loopback, port);
     }
 
     readonly ILogger Logger;
     readonly IConfiguration Configuration;
     readonly IServiceScopeFactory ServiceScopeFactory;
-    readonly TcpListener TcpListener;
+    TcpListener? Listener;
+    TlsServerAuthenticator? TlsAuthenticator;
 
     public override void Dispose()
     {
-        TcpListener.Dispose();
+        Listener?.Dispose();
+        TlsAuthenticator?.Dispose();
         base.Dispose();
     }
 
@@ -85,6 +77,20 @@ sealed partial class Server : BackgroundService
     {
         Logger.Debug(GitVersionInformation.InformationalVersion);
 
+        // Every connection is mutual TLS; there is no plaintext listener. Fail fast on configuration errors.
+        TlsSettings tlsSettings;
+        try
+        {
+            tlsSettings = TlsSettings.Read(Configuration);
+            TlsAuthenticator = new TlsServerAuthenticator(tlsSettings, Logger);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Logger.TlsConfigurationError(ex.Message);
+            throw;
+        }
+        var tlsAuthenticator = TlsAuthenticator;
+
         // Cleanup any left-overs in case the previous instance crashed.
         _ = UsbipdRegistry.Instance.SetAllDevicesAsDetached();
 
@@ -92,28 +98,27 @@ sealed partial class Server : BackgroundService
         // We require it so the ConfigurationManager can change the driver.
         EnablePrivilege("SeLoadDriverPrivilege");
 
+        Listener = tlsSettings.ListenAddress is null
+            ? TcpListener.Create(tlsSettings.Port)
+            : new TcpListener(tlsSettings.ListenAddress, tlsSettings.Port);
+
         // All client sockets will inherit these. Formally, these options have to
         // be set before the socket reaches connected state, including Accept().
-        TcpListener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
-        TcpListener.Server.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, 1 /* s */);
-        TcpListener.Server.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, 10 /* s */);
-        TcpListener.Server.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount, 5);
+        Listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+        Listener.Server.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, 1 /* s */);
+        Listener.Server.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, 10 /* s */);
+        Listener.Server.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount, 5);
 
-        TcpListener.Start();
+        Listener.Start();
+        Logger.TlsListening($"{Listener.LocalEndpoint}", tlsAuthenticator.ServerCertificate.Subject,
+            tlsAuthenticator.ServerCertificate.Thumbprint, tlsAuthenticator.ServerCertificate.NotAfter);
         while (true)
         {
-            var tcpClient = await TcpListener.AcceptTcpClientAsync(stoppingToken);
+            var tcpClient = await Listener.AcceptTcpClientAsync(stoppingToken);
             var clientAddress = (tcpClient.Client.RemoteEndPoint as IPEndPoint)!.Address;
             if (clientAddress.IsIPv4MappedToIPv6)
             {
                 clientAddress = clientAddress.MapToIPv4();
-            }
-            if (!IPAddress.IsLoopback(clientAddress))
-            {
-                // Belt and braces: the listener is bound to loopback only.
-                Logger.ClientNotLoopback(clientAddress);
-                tcpClient.Dispose();
-                continue;
             }
             if (clientAddress.Equals(IPAddress.Loopback))
             {
@@ -122,35 +127,74 @@ sealed partial class Server : BackgroundService
                 tcpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, false);
             }
 
-            _ = Task.Run(async () =>
+            _ = Task.Run(() => HandleClientAsync(tcpClient, clientAddress, tlsAuthenticator, stoppingToken), stoppingToken);
+        }
+    }
+
+    async Task HandleClientAsync(TcpClient tcpClient, IPAddress clientAddress, TlsServerAuthenticator tlsAuthenticator,
+        CancellationToken stoppingToken)
+    {
+        if (Logger.IsEnabled(LogLevel.Debug))
+        {
+            Logger.Debug($"new connection from {clientAddress}");
+        }
+        try
+        {
+            using var cancellationTokenRegistration = stoppingToken.Register(() => tcpClient.Close());
+            using var serviceScope = ServiceScopeFactory.CreateScope();
+            var clientContext = serviceScope.ServiceProvider.GetRequiredService<ClientContext>();
+            clientContext.TcpClient = tcpClient;
+            clientContext.ClientAddress = clientAddress;
+
+            SslStream? sslStream = null;
+            try
             {
-                if (Logger.IsEnabled(LogLevel.Debug))
+                sslStream = await tlsAuthenticator.AuthenticateAsync(tcpClient.GetStream(), stoppingToken);
+                clientContext.ClientCertificateSubject = sslStream.RemoteCertificate?.Subject;
+                clientContext.ClientCertificateThumbprint = sslStream.RemoteCertificate?.GetCertHashString();
+                // The client context owns the stream from here on.
+                clientContext.Stream = sslStream;
+                sslStream = null;
+            }
+            catch (AuthenticationException ex)
+            {
+                Logger.ClientTlsFailed(clientAddress, ex.InnerException?.Message ?? ex.Message);
+                return;
+            }
+            catch (IOException ex)
+            {
+                Logger.ClientTlsFailed(clientAddress, ex.Message);
+                return;
+            }
+            catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+            {
+                Logger.ClientTlsFailed(clientAddress, "the TLS handshake timed out");
+                return;
+            }
+            finally
+            {
+                if (sslStream is not null)
                 {
-                    Logger.Debug($"new connection from {clientAddress}");
+                    await sslStream.DisposeAsync();
                 }
-                try
-                {
-                    using var cancellationTokenRegistration = stoppingToken.Register(() => tcpClient.Close());
-                    using var serviceScope = ServiceScopeFactory.CreateScope();
-                    var clientContext = serviceScope.ServiceProvider.GetRequiredService<ClientContext>();
-                    clientContext.TcpClient = tcpClient;
-                    clientContext.ClientAddress = clientAddress;
-                    var connectedClient = serviceScope.ServiceProvider.GetRequiredService<ConnectedClient>();
-                    await connectedClient.RunAsync(stoppingToken);
-                }
-                catch (Exception ex)
-                {
-                    if (Logger.IsEnabled(LogLevel.Debug))
-                    {
-                        Logger.Debug($"connection close: {ex.Message}");
-                    }
-                    throw;
-                }
-                finally
-                {
-                    Logger.Debug("connection closed");
-                }
-            }, stoppingToken);
+            }
+            Logger.ClientTlsAuthenticated(clientAddress, clientContext.ClientCertificateSubject ?? string.Empty,
+                clientContext.ClientCertificateThumbprint ?? string.Empty);
+
+            var connectedClient = serviceScope.ServiceProvider.GetRequiredService<ConnectedClient>();
+            await connectedClient.RunAsync(stoppingToken);
+        }
+        catch (Exception ex)
+        {
+            if (Logger.IsEnabled(LogLevel.Debug))
+            {
+                Logger.Debug($"connection close: {ex.Message}");
+            }
+            throw;
+        }
+        finally
+        {
+            Logger.Debug("connection closed");
         }
     }
 }

@@ -25,8 +25,7 @@ sealed class AttachedEndpoint
         Logger = logger;
         Logger.Debug("Endpoint created");
 
-        var tcpClient = clientContext.TcpClient;
-        Stream = tcpClient.GetStream();
+        Stream = clientContext.Stream;
         Device = clientContext.AttachedDevice ?? throw new ArgumentException($"{nameof(ClientContext.AttachedDevice)} is null");
 
         Pcap = pcap;
@@ -52,7 +51,7 @@ sealed class AttachedEndpoint
     readonly ILogger Logger;
     readonly byte RawEndpoint;
     readonly PcapNg Pcap;
-    readonly NetworkStream Stream;
+    readonly Stream Stream;
     readonly Channel<RequestReply> ReplyChannel;
     readonly DeviceFile Device;
     long InterlockedSubmits;
