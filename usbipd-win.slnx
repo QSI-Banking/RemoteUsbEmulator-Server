@@ -32,6 +32,10 @@ SPDX-License-Identifier: GPL-3.0-only
     <Platform Solution="*|ARM64" Project="ARM64" />
     <Platform Solution="*|x64" Project="x64" />
   </Project>
+  <Project Path="Usbipd.InstallerActions/Usbipd.InstallerActions.csproj">
+    <Platform Solution="*|ARM64" Project="ARM64" />
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
   <Project Path="Usbipd.PowerShell/Usbipd.PowerShell.csproj" />
   <Project Path="Usbipd/Usbipd.csproj">
     <Platform Solution="*|ARM64" Project="ARM64" />

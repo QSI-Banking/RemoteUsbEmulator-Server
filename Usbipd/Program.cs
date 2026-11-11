@@ -924,6 +924,32 @@ static class Program
             AddInstallerSubcommand("uninstall_stubs", commandHandlers.InstallerUninstallStubs);
             AddInstallerSubcommand("disable_forced", commandHandlers.InstallerDisableForced);
             AddInstallerSubcommand("enable_forced", commandHandlers.InstallerEnableForced);
+            {
+                //
+                //  installer configure_tls [--port <PORT>] [--server-certificate <THUMBPRINT>] [--client-ca <THUMBPRINTS>]
+                //
+                var portOption = new Option<string>("--port")
+                {
+                    Description = "TLS port",
+                };
+                var serverCertificateOption = new Option<string>("--server-certificate")
+                {
+                    Description = "Thumbprint of the server certificate in LocalMachine\\My",
+                };
+                var clientCaOption = new Option<string>("--client-ca")
+                {
+                    Description = "Thumbprints of the CAs that issue client certificates",
+                };
+                var configureTlsCommand = new Command("configure_tls")
+                {
+                    portOption,
+                    serverCertificateOption,
+                    clientCaOption,
+                };
+                configureTlsCommand.SetAction(parseResult => (int)InstallerTlsConfiguration.Configure(console,
+                    parseResult.GetValue(portOption), parseResult.GetValue(serverCertificateOption), parseResult.GetValue(clientCaOption)));
+                installCommand.Subcommands.Add(configureTlsCommand);
+            }
 
             rootCommand.Subcommands.Add(installCommand);
         }

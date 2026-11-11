@@ -161,13 +161,18 @@ sealed class TlsSettings
     }
 
     /// <summary>
+    /// Splits a list given as one string, with entries separated by commas, semicolons or spaces.
+    /// </summary>
+    public static string[] SplitList(string value) => value.Split(ListSeparators, StringSplitOptions.RemoveEmptyEntries);
+
+    /// <summary>
     /// Accepts a JSON array, or a single string with entries separated by commas, semicolons or spaces.
     /// </summary>
     static List<string> ReadList(IConfigurationSection section)
     {
         if (!string.IsNullOrWhiteSpace(section.Value))
         {
-            return [.. section.Value.Split(ListSeparators, StringSplitOptions.RemoveEmptyEntries)];
+            return [.. SplitList(section.Value)];
         }
         var values = new List<string>();
         foreach (var child in section.GetChildren())

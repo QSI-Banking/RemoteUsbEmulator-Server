@@ -251,13 +251,12 @@ SPDX-License-Identifier: GPL-3.0-only
                     Text="$(var.ButtonBackText)"
                     />
                 <Control
-                    Id="Install" Type="PushButton" X="$(var.WizardButtonX2)" Y="$(var.WizardButtonY)" Width="$(var.ButtonW)" Height="$(var.ButtonH)"
-                    ElevationShield="yes"
+                    Id="Next" Type="PushButton" X="$(var.WizardButtonX2)" Y="$(var.WizardButtonY)" Width="$(var.ButtonW)" Height="$(var.ButtonH)"
                     Default="yes"
-                    Text="$(var.ButtonInstallText)"
+                    Text="$(var.ButtonNextText)"
                     >
                     <Publish Property="InstallMode" Value="Install" />
-                    <Publish Event="EndDialog" Value="Return" />
+                    <Publish Event="NewDialog" Value="Tls" />
                 </Control>
                 <Control
                     Id="Cancel" Type="PushButton" X="$(var.WizardButtonX3)" Y="$(var.WizardButtonY)" Width="$(var.ButtonW)" Height="$(var.ButtonH)"
@@ -297,13 +296,12 @@ SPDX-License-Identifier: GPL-3.0-only
                     Text="$(var.ButtonBackText)"
                     />
                 <Control
-                    Id="Update" Type="PushButton" X="$(var.WizardButtonX2)" Y="$(var.WizardButtonY)" Width="$(var.ButtonW)" Height="$(var.ButtonH)"
-                    ElevationShield="yes"
+                    Id="Next" Type="PushButton" X="$(var.WizardButtonX2)" Y="$(var.WizardButtonY)" Width="$(var.ButtonW)" Height="$(var.ButtonH)"
                     Default="yes"
-                    Text="$(var.ButtonUpdateText)"
+                    Text="$(var.ButtonNextText)"
                     >
                     <Publish Property="InstallMode" Value="Update" />
-                    <Publish Event="EndDialog" Value="Return" />
+                    <Publish Event="NewDialog" Value="Tls" />
                 </Control>
                 <Control
                     Id="Cancel" Type="PushButton" X="$(var.WizardButtonX3)" Y="$(var.WizardButtonY)" Width="$(var.ButtonW)" Height="$(var.ButtonH)"
@@ -323,6 +321,77 @@ SPDX-License-Identifier: GPL-3.0-only
                     Id="Content" Type="Text" X="$(var.ContentX)" Y="$(var.ContentY)" Width="$(var.ContentW)" Height="52" TabSkip="yes"
                     Text="{\Body}This wizard will update the current installation of [ProductName]." NoPrefix="yes"
                     />
+            </Dialog>
+
+            <!--
+            Mutual TLS settings. The drop-downs are filled by the ListCertificates custom action;
+            the initial values come from appsettings.json (ReadTlsSettings) or the command line.
+            -->
+            <?define TlsComplete="TLS_PORT AND TLS_SERVER_CERT AND TLS_CLIENT_CA" ?>
+
+            <Dialog Id="Tls" Width="$(var.WizardW)" Height="$(var.WizardH)" Title="$(var.WizardTitle)">
+                <!-- dialog -->
+                <Control Id="BannerBitmap" Type="Bitmap" X="$(var.BannerBitmapX)" Y="$(var.BannerBitmapY)" Width="$(var.BannerBitmapW)" Height="$(var.BannerBitmapH)" TabSkip="yes" Text="banner.png" />
+
+                <!-- wizard -->
+                <Control Id="BottomLine" Type="Line" X="0" Y="$(var.WizardLineY)" Width="$(var.WizardLineW)" Height="0" />
+                <Control
+                    Id="Back" Type="PushButton" X="$(var.WizardButtonX1)" Y="$(var.WizardButtonY)" Width="$(var.ButtonW)" Height="$(var.ButtonH)"
+                    Text="$(var.ButtonBackText)"
+                    >
+                    <Publish Event="NewDialog" Value="Install" Condition="InstallMode = &quot;Install&quot;" />
+                    <Publish Event="NewDialog" Value="Update" Condition="InstallMode = &quot;Update&quot;" />
+                </Control>
+                <Control
+                    Id="Install" Type="PushButton" X="$(var.WizardButtonX2)" Y="$(var.WizardButtonY)" Width="$(var.ButtonW)" Height="$(var.ButtonH)"
+                    ElevationShield="yes"
+                    Default="yes"
+                    Text="$(var.ButtonInstallText)"
+                    >
+                    <Publish Event="SpawnDialog" Value="TlsIncomplete" Condition="NOT ($(var.TlsComplete))" />
+                    <Publish Event="EndDialog" Value="Return" Condition="$(var.TlsComplete)" />
+                </Control>
+                <Control
+                    Id="Cancel" Type="PushButton" X="$(var.WizardButtonX3)" Y="$(var.WizardButtonY)" Width="$(var.ButtonW)" Height="$(var.ButtonH)"
+                    Cancel="yes"
+                    Text="$(var.ButtonCancelText)"
+                    >
+                    <Publish Event="EndDialog" Value="Exit" />
+                </Control>
+
+                <!-- content -->
+                <Control
+                    Id="Title" Type="Text" X="$(var.TitleX)" Y="$(var.TitleY)" Width="$(var.TitleW)" Height="$(var.TitleH)" TabSkip="yes"
+                    Text="{\Title}Mutual TLS" NoPrefix="yes"
+                    />
+                <Control
+                    Id="Content" Type="Text" X="$(var.ContentX)" Y="72" Width="$(var.ContentW)" Height="26" TabSkip="yes" NoPrefix="yes"
+                    Text="{\Caption}Clients connect only over mutual TLS. Choose this server's certificate and the CA that issues the client certificates."
+                    />
+
+                <Control Id="PortLabel" Type="Text" X="30" Y="104" Width="100" Height="13" TabSkip="yes" Text="{\Caption}&amp;TLS port:" />
+                <Control Id="Port" Type="Edit" X="140" Y="102" Width="50" Height="15" Property="TLS_PORT" Integer="yes" />
+
+                <Control Id="ServerCertLabel" Type="Text" X="30" Y="124" Width="310" Height="13" TabSkip="yes"
+                    Text="{\Caption}&amp;Server certificate (Local Computer, Personal store, with private key):" />
+                <Control Id="ServerCert" Type="ComboBox" X="30" Y="137" Width="310" Height="16" Property="TLS_SERVER_CERT" ComboList="yes" Sorted="no" />
+
+                <Control Id="ClientCaLabel" Type="Text" X="30" Y="160" Width="310" Height="13" TabSkip="yes"
+                    Text="{\Caption}&amp;CA that issues client certificates (Trusted Root or Intermediate):" />
+                <Control Id="ClientCa" Type="ComboBox" X="30" Y="173" Width="310" Height="16" Property="TLS_CLIENT_CA" ComboList="yes" Sorted="no" />
+
+                <Control
+                    Id="Hint" Type="Text" X="30" Y="196" Width="310" Height="34" TabSkip="yes" NoPrefix="yes"
+                    Text="{\Caption}Import the certificates into the Local Computer stores first. Silent install: TLS_PORT, TLS_SERVER_CERT and TLS_CLIENT_CA (thumbprints)."
+                    />
+            </Dialog>
+
+            <Dialog Id="TlsIncomplete" Width="260" Height="85" Title="$(var.WizardTitle)" NoMinimize="yes">
+                <Control Id="Text" Type="Text" X="15" Y="15" Width="230" Height="40" TabSkip="no" NoPrefix="yes"
+                    Text="{\Body}Enter the TLS port and choose both the server certificate and the client certificate CA." />
+                <Control Id="OK" Type="PushButton" X="180" Y="58" Width="66" Height="20" Default="yes" Cancel="yes" Text="{\Caption}&amp;OK">
+                    <Publish Event="EndDialog" Value="Return" />
+                </Control>
             </Dialog>
 
             <Dialog Id="Resume" Width="$(var.WizardW)" Height="$(var.WizardH)" Title="$(var.WizardTitle)">

@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 QSI-Banking
+
+SPDX-License-Identifier: GPL-3.0-only
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+  Managed (DTF) custom actions for the MSI user interface: fill the certificate drop-downs from the
+  Windows certificate store and preset the TLS settings from an existing appsettings.json.
+  They run in msiexec only; nothing is installed. Writing the settings is done by usbipd.exe itself
+  ('usbipd installer configure_tls'), as for the other installer actions.
+  -->
+  <PropertyGroup>
+    <!-- DTF custom actions run on the .NET Framework that is part of Windows -->
+    <TargetFramework>net472</TargetFramework>
+    <Platforms>x64;ARM64</Platforms>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <AcceptEula>wix7</AcceptEula>
+
+    <!-- The repository defaults are tuned for the net10.0 service; keep the analyzers but do not fail the build on them -->
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Dtf.CustomAction" />
+    <Reference Include="System.Web.Extensions" />
+    <!-- packed into the .CA.dll by the DTF build; selects the .NET Framework 4 runtime -->
+    <Content Include="CustomAction.config" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

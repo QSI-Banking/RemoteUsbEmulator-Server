@@ -13,10 +13,14 @@ SPDX-License-Identifier: GPL-3.0-only
     <DefineConstants>Copyright=$(Copyright)</DefineConstants>
     <Pedantic>true</Pedantic>
     <BuildProjectReferences>false</BuildProjectReferences>
+    <!-- ICE17: the certificate drop-downs of the TLS dialog are filled at run time (ListCertificates custom action) -->
+    <SuppressIces>ICE17</SuppressIces>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Usbipd\Usbipd.csproj" Publish="true" />
     <ProjectReference Include="..\Usbipd.PowerShell\Usbipd.PowerShell.csproj" Publish="true" />
+    <!-- DTF custom actions for the TLS dialog (certificate lists); built by the solution build -->
+    <ProjectReference Include="..\Usbipd.InstallerActions\Usbipd.InstallerActions.csproj" />
   </ItemGroup>
   <ItemGroup>
     <BindPath Include="..\Usbipd\bin\publish\$(Platform)" />

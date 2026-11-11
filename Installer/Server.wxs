@@ -23,7 +23,7 @@ SPDX-License-Identifier: GPL-3.0-only
                         Id="usbipd"
                         Name="usbipd"
                         Protocol="tcp"
-                        Port="3241"
+                        Port="[TLS_PORT]"
                         Profile="all"
                         Scope="any"
                         Description="Allow USB/IP clients to reach the USBIP Device Host service over mutual TLS."
@@ -96,7 +96,7 @@ SPDX-License-Identifier: GPL-3.0-only
             </Component>
 
             <!--
-            Holds the TLS settings. Edited after installation, so never overwritten and kept on uninstall and upgrade.
+            Holds the TLS settings, written by 'usbipd installer configure_tls' (ConfigureTls). Never overwritten, and kept on uninstall and upgrade.
             -->
             <Component Id="appsettings.json" NeverOverwrite="yes" Permanent="yes">
                 <File Id="appsettings.json" Name="appsettings.json" />
@@ -188,7 +188,32 @@ SPDX-License-Identifier: GPL-3.0-only
         <SetProperty Id="EnableForced" Value="&quot;[#usbipd.exe]&quot; installer enable_forced" Sequence="execute" Before="EnableForced" Condition="$(var.InstallOrUpdateOrRepair)" />
         <CustomAction Id="EnableForced" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixQuietExec" Return="ignore" Impersonate="no" Execute="deferred" />
 
+        <!--
+        TLS settings, chosen in the TLS dialog or passed on the command line (silent install):
+            msiexec /i usbipd-win.msi /qn TLS_PORT=3241 TLS_SERVER_CERT=<thumbprint> TLS_CLIENT_CA=<thumbprint>[,<thumbprint>...]
+        Values that are not passed are read from the existing appsettings.json (ReadTlsSettings), so a silent upgrade keeps them.
+        usbipd.exe writes and validates appsettings.json itself; an invalid choice fails (and rolls back) the installation.
+        -->
+        <Property Id="TLS_PORT" Secure="yes" />
+        <!-- the TLS dialog drop-downs are filled at run time (ListCertificates), the table must exist -->
+        <EnsureTable Id="ComboBox" />
+        <Property Id="TLS_SERVER_CERT" Secure="yes" />
+        <Property Id="TLS_CLIENT_CA" Secure="yes" />
+
+        <Binary Id="UsbipdTlsCA" SourceFile="$(var.Usbipd.InstallerActions.TargetDir)Usbipd.InstallerActions.CA.dll" />
+        <CustomAction Id="ReadTlsSettings" BinaryRef="UsbipdTlsCA" DllEntry="ReadTlsSettings" Execute="immediate" Return="check" />
+        <CustomAction Id="ListCertificates" BinaryRef="UsbipdTlsCA" DllEntry="ListCertificates" Execute="immediate" Return="ignore" />
+
+        <SetProperty Id="ConfigureTls" Value="&quot;[#usbipd.exe]&quot; installer configure_tls --port &quot;[TLS_PORT]&quot; --server-certificate &quot;[TLS_SERVER_CERT]&quot; --client-ca &quot;[TLS_CLIENT_CA]&quot;" Sequence="execute" Before="ConfigureTls" Condition="$(var.InstallOrUpdateOrRepair)" />
+        <CustomAction Id="ConfigureTls" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixQuietExec" Return="check" Impersonate="no" Execute="deferred" />
+
+        <InstallUISequence>
+            <Custom Action="ReadTlsSettings" After="CostFinalize" />
+            <Custom Action="ListCertificates" After="ReadTlsSettings" />
+        </InstallUISequence>
+
         <InstallExecuteSequence>
+            <Custom Action="ReadTlsSettings" After="CostFinalize" />
             <Custom Action="DetachAll" Before="StopServices" Condition="$(var.UpdateOrRepair)" />
             <Custom Action="DelayAfterDetach" Before="StopServices" Condition="$(var.UpdateOrRepair)" />
             <Custom Action="DisableForced" Before="StopServices" Condition="$(var.UpdateOrRepair)" />
@@ -202,6 +227,8 @@ SPDX-License-Identifier: GPL-3.0-only
             <Custom Action="InstallDriver" Before="InstallServices" Condition="$(var.InstallOrUpdateOrRepair)" />
             <Custom Action="InstallMonitor" Before="InstallServices" Condition="$(var.InstallOrUpdateOrRepair)" />
 
+            <!-- before the service is started, which reads appsettings.json -->
+            <Custom Action="ConfigureTls" Before="TryStartService" Condition="$(var.InstallOrUpdateOrRepair)" />
             <Custom Action="TryStartService" After="StartServices" Condition="$(var.InstallOrUpdateOrRepair)" />
             <Custom Action="UpdateDrivers" After="StartServices" Condition="$(var.InstallOrUpdateOrRepair)" />
             <Custom Action="UninstallOldDrivers2" After="StartServices" Condition="$(var.InstallOrUpdateOrRepair)" />
