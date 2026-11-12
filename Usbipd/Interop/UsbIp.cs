@@ -75,6 +75,9 @@ static class UsbIp
 
         /// <summary>OP_REQ_AUTH rejected (unknown user or wrong one-time password).</summary>
         ST_AUTH_FAILED,
+
+        /// <summary>The server cannot check the user right now: its user database is unreachable.</summary>
+        ST_SERVER_UNAVAILABLE,
     }
 
     internal enum UsbIpCmd : uint

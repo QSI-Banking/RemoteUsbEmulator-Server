@@ -159,7 +159,7 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
         {
             // No attaches while the user database is unreachable.
             Logger.UserDatabaseUnavailable(ClientContext.ClientAddress, userName, ex.Message);
-            await SendOpCodeAsync(OpCode.OP_REP_AUTH, Status.ST_ERROR);
+            await SendOpCodeAsync(OpCode.OP_REP_AUTH, Status.ST_SERVER_UNAVAILABLE);
             return false;
         }
         var device = guid.HasValue ? UsbipdRegistry.Instance.GetBoundDevices().SingleOrDefault(d => d.PersistedGuid == guid.Value) : null;
@@ -219,7 +219,7 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
             catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))
             {
                 Logger.UserDatabaseUnavailable(ClientContext.ClientAddress, ClientContext.AuthenticatedUser, ex.Message);
-                await SendOpCodeAsync(OpCode.OP_REP_IMPORT, Status.ST_ERROR);
+                await SendOpCodeAsync(OpCode.OP_REP_IMPORT, Status.ST_SERVER_UNAVAILABLE);
                 return;
             }
             if (currentGuid != device.PersistedGuid)
