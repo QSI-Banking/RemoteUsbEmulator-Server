@@ -240,7 +240,8 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
             }
 
             // Per-device lock: one import (and attachment) per device, held until the device is detached.
-            using var session = SessionRegistry.TryClaim(device.PersistedGuid.Value, ClientContext.AuthenticatedUser, ClientContext.ClientAddress);
+            using var session = SessionRegistry.TryClaim(device.PersistedGuid.Value, ClientContext.AuthenticatedUser, ClientContext.ClientAddress,
+                ClientContext.ClientCertificateThumbprint ?? string.Empty);
             if (session is null)
             {
                 Logger.ClientDeviceBusy(ClientContext.ClientAddress, ClientContext.AuthenticatedUser, busId);

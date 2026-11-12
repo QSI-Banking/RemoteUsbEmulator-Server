@@ -15,16 +15,18 @@ sealed partial class Server : BackgroundService
 {
     public const string SingletonMutexName = @"Global\usbipd-{A8256F62-728F-49B0-82BB-E5E48F83D28F}";
 
-    public Server(ILogger<Server> logger, IConfiguration config, IServiceScopeFactory serviceScopeFactory, PcapNg _)
+    public Server(ILogger<Server> logger, IConfiguration config, IServiceScopeFactory serviceScopeFactory, IClientAllowList allowList, PcapNg _)
     {
         Logger = logger;
         Configuration = config;
         ServiceScopeFactory = serviceScopeFactory;
+        AllowList = allowList;
     }
 
     readonly ILogger Logger;
     readonly IConfiguration Configuration;
     readonly IServiceScopeFactory ServiceScopeFactory;
+    readonly IClientAllowList AllowList;
     TcpListener? Listener;
     TlsServerAuthenticator? TlsAuthenticator;
 
@@ -82,7 +84,7 @@ sealed partial class Server : BackgroundService
         try
         {
             tlsSettings = TlsSettings.Read(Configuration);
-            TlsAuthenticator = new TlsServerAuthenticator(tlsSettings, Logger);
+            TlsAuthenticator = new TlsServerAuthenticator(tlsSettings, AllowList, Logger);
         }
         catch (InvalidOperationException ex)
         {

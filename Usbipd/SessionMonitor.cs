@@ -6,12 +6,15 @@ namespace Usbipd;
 
 /// <summary>
 /// Revokes active sessions whose user was removed or mapped to another device ('usbipd user remove', 'usbipd user add --force'),
-/// or whose attachment record was deleted ('usbipd detach', 'usbipd unbind').
+/// whose attachment record was deleted ('usbipd detach', 'usbipd unbind'), or whose client certificate was disabled or removed
+/// ('usbipd client disable', 'usbipd client remove').
 /// </summary>
-sealed class SessionMonitor(SessionRegistry sessionRegistry, IUserDeviceMap userDeviceMap, ILogger<SessionMonitor> logger) : BackgroundService
+sealed class SessionMonitor(SessionRegistry sessionRegistry, IUserDeviceMap userDeviceMap, IClientAllowList allowList,
+    ILogger<SessionMonitor> logger) : BackgroundService
 {
     readonly SessionRegistry SessionRegistry = sessionRegistry;
     readonly IUserDeviceMap UserDeviceMap = userDeviceMap;
+    readonly IClientAllowList AllowList = allowList;
     readonly ILogger Logger = logger;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -27,11 +30,16 @@ sealed class SessionMonitor(SessionRegistry sessionRegistry, IUserDeviceMap user
     {
         // Take the sessions before reading the records: a session that is recorded now has its record written already.
         var sessions = SessionRegistry.Snapshot();
+        if (sessions.Length == 0)
+        {
+            return;
+        }
         var recorded = sessions.Where(s => s.IsRecorded).ToList();
         IReadOnlySet<Guid> attached;
         try
         {
             attached = recorded.Count == 0 ? new HashSet<Guid>() : UserDeviceMap.GetAttachedDevices();
+            AllowList.Refresh();
         }
         catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))
         {
@@ -50,6 +58,21 @@ sealed class SessionMonitor(SessionRegistry sessionRegistry, IUserDeviceMap user
         {
             if (session.EndReason is not null)
             {
+                continue;
+            }
+            bool clientAllowed;
+            try
+            {
+                clientAllowed = AllowList.IsAllowed(session.ClientThumbprint);
+            }
+            catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))
+            {
+                Logger.SessionCheckFailed(ex.Message);
+                return;
+            }
+            if (!clientAllowed)
+            {
+                session.Revoke("the client certificate was disabled or removed");
                 continue;
             }
             Guid? current;

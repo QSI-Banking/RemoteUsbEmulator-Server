@@ -48,6 +48,20 @@ static class Program
         return guid;
     }
 
+    static string ParseThumbprint(ArgumentResult argumentResult)
+    {
+        var value = argumentResult.Tokens[0].Value;
+        try
+        {
+            return TlsSettings.NormalizeThumbprint(value, "thumbprint");
+        }
+        catch (InvalidOperationException)
+        {
+            argumentResult.AddError($"Invalid thumbprint '{value}'; use the 40 hex digit SHA-1 thumbprint of the certificate.");
+            return value;
+        }
+    }
+
     static string ParseUserName(ArgumentResult argumentResult)
     {
         var value = argumentResult.Tokens[0].Value;
@@ -869,6 +883,127 @@ static class Program
                 userCommand.Subcommands.Add(removeCommand);
             }
             rootCommand.Subcommands.Add(userCommand);
+        }
+        {
+            //
+            //  client
+            //
+            var clientCommand = new Command("client", "Manage client certificates\0" +
+                "Only listed, enabled client certificates may connect (to all servers). " +
+                "They must also be issued by a CA in usbipd:Tls:ClientCaThumbprints.");
+
+            static Option<string> CreateThumbprintOption(string description, bool required)
+            {
+                var option = new Option<string>("--thumbprint", "-t")
+                {
+                    Description = description,
+                    HelpName = "THUMBPRINT",
+                    Required = required,
+                    CustomParser = ParseThumbprint,
+                };
+                option.CompletionSources.Add(completionContext => CompletionGuard(completionContext, () =>
+                    CommandHandlers.TryGetClientThumbprints().Select(t => new CompletionItem(t))));
+                return option;
+            }
+            {
+                //
+                //  client add [--thumbprint <THUMBPRINT>]
+                //
+                var thumbprintOption = CreateThumbprintOption("Allow the client certificate having SHA-1 <THUMBPRINT>", false);
+                //
+                //  client add [--certificate <FILE>]
+                //
+                var certificateOption = new Option<string>("--certificate", "-c")
+                {
+                    Description = "Allow the client certificate in <FILE> (.cer, DER or PEM, no private key)",
+                    HelpName = "FILE",
+                };
+                //
+                //  client add --name <NAME>
+                //
+                var nameOption = new Option<string>("--name", "-n")
+                {
+                    Description = "Name for administrators, for example the client's computer name",
+                    HelpName = "NAME",
+                    Required = true,
+                };
+                //
+                //  client add
+                //
+                var addCommand = new Command("add", "Allow a client certificate\0" + $"""
+                    Allows a client certificate to connect to all servers. Effective within a few seconds.
+
+                    {OneOfRequiredText(thumbprintOption, certificateOption)}
+                    """.Unwrap())
+                {
+                    thumbprintOption,
+                    certificateOption,
+                    nameOption,
+                };
+                addCommand.Validators.Add(commandResult => ValidateOneOf(commandResult, thumbprintOption, certificateOption));
+                addCommand.SetAction(async (parseResult, cancellationToken) => (int)
+                    await commandHandlers.ClientAdd(parseResult.GetValue(thumbprintOption), parseResult.GetValue(certificateOption),
+                        parseResult.GetRequiredValue(nameOption), console, cancellationToken)
+                );
+                clientCommand.Subcommands.Add(addCommand);
+            }
+            {
+                //
+                //  client list
+                //
+                var listCommand = new Command("list", "List client certificates\0" +
+                    "List all client certificates and whether they may connect.");
+                listCommand.SetAction(async (parseResult, cancellationToken) => (int)
+                    await commandHandlers.ClientList(console, cancellationToken)
+                );
+                clientCommand.Subcommands.Add(listCommand);
+            }
+            {
+                //
+                //  client enable --thumbprint <THUMBPRINT>
+                //
+                var thumbprintOption = CreateThumbprintOption("Enable the client certificate having <THUMBPRINT>", true);
+                var enableCommand = new Command("enable", "Enable a client certificate\0" +
+                    "Allows a disabled client certificate to connect again.")
+                {
+                    thumbprintOption,
+                };
+                enableCommand.SetAction(async (parseResult, cancellationToken) => (int)
+                    await commandHandlers.ClientEnable(parseResult.GetRequiredValue(thumbprintOption), console, cancellationToken)
+                );
+                clientCommand.Subcommands.Add(enableCommand);
+            }
+            {
+                //
+                //  client disable --thumbprint <THUMBPRINT>
+                //
+                var thumbprintOption = CreateThumbprintOption("Disable the client certificate having <THUMBPRINT>", true);
+                var disableCommand = new Command("disable", "Disable a client certificate\0" +
+                    "Refuses new connections with the certificate, and ends its sessions on all servers within a few seconds.")
+                {
+                    thumbprintOption,
+                };
+                disableCommand.SetAction(async (parseResult, cancellationToken) => (int)
+                    await commandHandlers.ClientDisable(parseResult.GetRequiredValue(thumbprintOption), console, cancellationToken)
+                );
+                clientCommand.Subcommands.Add(disableCommand);
+            }
+            {
+                //
+                //  client remove --thumbprint <THUMBPRINT>
+                //
+                var thumbprintOption = CreateThumbprintOption("Remove the client certificate having <THUMBPRINT>", true);
+                var removeCommand = new Command("remove", "Remove a client certificate\0" +
+                    "Removes the certificate from the list; as disable, but it is no longer listed.")
+                {
+                    thumbprintOption,
+                };
+                removeCommand.SetAction(async (parseResult, cancellationToken) => (int)
+                    await commandHandlers.ClientRemove(parseResult.GetRequiredValue(thumbprintOption), console, cancellationToken)
+                );
+                clientCommand.Subcommands.Add(removeCommand);
+            }
+            rootCommand.Subcommands.Add(clientCommand);
         }
         {
             //

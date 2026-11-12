@@ -12,6 +12,7 @@ namespace UnitTests;
 sealed class SessionRegistry_Tests
 {
     static readonly Guid Device1 = new("11111111-1111-1111-1111-111111111111");
+    const string ClientThumbprint = "C9AFC9A5AABA73F34694634DD4E26D2D6D6F5CB1";
     static readonly Guid Device2 = new("22222222-2222-2222-2222-222222222222");
 
     static IConfiguration CreateConfiguration(params (string Key, string Value)[] values)
@@ -30,6 +31,13 @@ sealed class SessionRegistry_Tests
         public Guid? GetDeviceGuid(string userName) => Map.TryGetValue(userName, out var guid) ? guid : null;
         public HashSet<Guid> Attached { get; } = [];
         public IReadOnlySet<Guid> GetAttachedDevices() => Attached;
+    }
+
+    sealed class FakeClientAllowList : IClientAllowList
+    {
+        public HashSet<string> Allowed { get; } = new(StringComparer.OrdinalIgnoreCase) { ClientThumbprint };
+        public bool IsAllowed(string thumbprint) => Allowed.Contains(thumbprint);
+        public void Refresh() { }
     }
 
     [TestMethod]
@@ -73,9 +81,9 @@ sealed class SessionRegistry_Tests
     {
         var registry = new SessionRegistry(CreateConfiguration());
 
-        using var first = registry.TryClaim(Device1, "alice", IPAddress.Loopback);
-        using var second = registry.TryClaim(Device1, "bob", IPAddress.Loopback);
-        using var other = registry.TryClaim(Device2, "bob", IPAddress.Loopback);
+        using var first = registry.TryClaim(Device1, "alice", IPAddress.Loopback, ClientThumbprint);
+        using var second = registry.TryClaim(Device1, "bob", IPAddress.Loopback, ClientThumbprint);
+        using var other = registry.TryClaim(Device2, "bob", IPAddress.Loopback, ClientThumbprint);
 
         Assert.IsNotNull(first);
         Assert.IsNull(second);
@@ -89,7 +97,7 @@ sealed class SessionRegistry_Tests
         var registry = new SessionRegistry(CreateConfiguration());
 
         var sessions = Enumerable.Range(0, 64).AsParallel()
-            .Select(i => registry.TryClaim(Device1, $"user{i}", IPAddress.Loopback)).ToList();
+            .Select(i => registry.TryClaim(Device1, $"user{i}", IPAddress.Loopback, ClientThumbprint)).ToList();
 
         Assert.AreEqual(1, sessions.Count(s => s is not null));
         foreach (var session in sessions)
@@ -103,13 +111,13 @@ sealed class SessionRegistry_Tests
     {
         var registry = new SessionRegistry(CreateConfiguration());
 
-        var session = registry.TryClaim(Device1, "alice", IPAddress.Loopback);
+        var session = registry.TryClaim(Device1, "alice", IPAddress.Loopback, ClientThumbprint);
         Assert.IsNotNull(session);
         session.Dispose();
         session.Dispose(); // twice is fine
         session.Revoke("after dispose"); // does not throw
 
-        using var again = registry.TryClaim(Device1, "bob", IPAddress.Loopback);
+        using var again = registry.TryClaim(Device1, "bob", IPAddress.Loopback, ClientThumbprint);
         Assert.IsNotNull(again);
     }
 
@@ -117,7 +125,7 @@ sealed class SessionRegistry_Tests
     public void Revoke_FirstReasonWins()
     {
         var registry = new SessionRegistry(CreateConfiguration());
-        using var session = registry.TryClaim(Device1, "alice", IPAddress.Loopback);
+        using var session = registry.TryClaim(Device1, "alice", IPAddress.Loopback, ClientThumbprint);
         Assert.IsNotNull(session);
 
         Assert.IsNull(session.EndReason);
@@ -134,7 +142,7 @@ sealed class SessionRegistry_Tests
     public async Task StartClock_RevokesAfterMaxDuration()
     {
         var registry = new SessionRegistry(CreateConfiguration());
-        using var session = registry.TryClaim(Device1, "alice", IPAddress.Loopback);
+        using var session = registry.TryClaim(Device1, "alice", IPAddress.Loopback, ClientThumbprint);
         Assert.IsNotNull(session);
 
         session.StartClock(TimeSpan.FromMilliseconds(50));
@@ -154,12 +162,13 @@ sealed class SessionRegistry_Tests
         map.Map["bob"] = Device2;
         map.Map["carol"] = Device2;
 
-        using var alice = registry.TryClaim(Device1, "alice", IPAddress.Loopback);
-        using var bob = registry.TryClaim(Device2, "bob", IPAddress.Loopback);
+        using var alice = registry.TryClaim(Device1, "alice", IPAddress.Loopback, ClientThumbprint);
+        using var bob = registry.TryClaim(Device2, "bob", IPAddress.Loopback, ClientThumbprint);
         Assert.IsNotNull(alice);
         Assert.IsNotNull(bob);
 
-        using var monitor = new SessionMonitor(registry, map, NullLogger<SessionMonitor>.Instance);
+        var allowList = new FakeClientAllowList();
+        using var monitor = new SessionMonitor(registry, map, allowList, NullLogger<SessionMonitor>.Instance);
         monitor.CheckSessions();
         Assert.IsNull(alice.EndReason);
         Assert.IsNull(bob.EndReason);
@@ -180,13 +189,14 @@ sealed class SessionRegistry_Tests
         map.Map["alice"] = Device1;
         map.Map["bob"] = Device2;
 
-        using var alice = registry.TryClaim(Device1, "alice", IPAddress.Loopback);
-        using var bob = registry.TryClaim(Device2, "bob", IPAddress.Loopback);
+        using var alice = registry.TryClaim(Device1, "alice", IPAddress.Loopback, ClientThumbprint);
+        using var bob = registry.TryClaim(Device2, "bob", IPAddress.Loopback, ClientThumbprint);
         Assert.IsNotNull(alice);
         Assert.IsNotNull(bob);
 
         // Not recorded yet (importing): the missing record does not count.
-        using var monitor = new SessionMonitor(registry, map, NullLogger<SessionMonitor>.Instance);
+        var allowList = new FakeClientAllowList();
+        using var monitor = new SessionMonitor(registry, map, allowList, NullLogger<SessionMonitor>.Instance);
         monitor.CheckSessions();
         Assert.IsNull(alice.EndReason);
         Assert.IsNull(bob.EndReason);
@@ -204,5 +214,26 @@ sealed class SessionRegistry_Tests
         monitor.CheckSessions();
         Assert.AreEqual("an administrator detached or unbound the device", alice.EndReason);
         Assert.IsNull(bob.EndReason);
+    }
+
+    [TestMethod]
+    public void Monitor_RevokesDisabledClientCertificates()
+    {
+        var registry = new SessionRegistry(CreateConfiguration());
+        var map = new FakeUserDeviceMap();
+        map.Map["alice"] = Device1;
+
+        using var alice = registry.TryClaim(Device1, "alice", IPAddress.Loopback, ClientThumbprint);
+        Assert.IsNotNull(alice);
+
+        var allowList = new FakeClientAllowList();
+        using var monitor = new SessionMonitor(registry, map, allowList, NullLogger<SessionMonitor>.Instance);
+        monitor.CheckSessions();
+        Assert.IsNull(alice.EndReason);
+
+        // 'usbipd client disable'
+        _ = allowList.Allowed.Remove(ClientThumbprint);
+        monitor.CheckSessions();
+        Assert.AreEqual("the client certificate was disabled or removed", alice.EndReason);
     }
 }

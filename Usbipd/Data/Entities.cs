@@ -97,6 +97,41 @@ sealed class Attachment
 }
 
 /// <summary>
+/// A client certificate that may connect ('usbipd client add'). The list is shared by all servers.
+/// A certificate must also be issued by a CA in usbipd:Tls:ClientCaThumbprints.
+/// </summary>
+sealed class ClientCertificate
+{
+    public int Id { get; set; }
+
+    /// <summary>
+    /// SHA-1 thumbprint, 40 upper case hex digits.
+    /// </summary>
+    public string Thumbprint { get; set; } = string.Empty;
+
+    /// <summary>
+    /// For administrators, for example the computer name of the client.
+    /// </summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The certificate subject, if it was added from a certificate file.
+    /// </summary>
+    public string? Subject { get; set; }
+
+    public DateTime? NotAfterUtc { get; set; }
+
+    /// <summary>
+    /// Disabled certificates are refused, and their sessions end.
+    /// </summary>
+    public bool Enabled { get; set; }
+
+    public DateTime CreatedUtc { get; set; }
+
+    public string CreatedBy { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// A policy rule ('usbipd policy add') of one server.
 /// </summary>
 sealed class PolicyRuleEntry

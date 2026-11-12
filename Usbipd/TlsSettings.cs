@@ -39,11 +39,6 @@ sealed class TlsSettings
     /// </summary>
     public HashSet<string> ClientCaThumbprints { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>
-    /// If not empty, only these client certificates are accepted.
-    /// </summary>
-    public HashSet<string> AllowedClientThumbprints { get; } = new(StringComparer.OrdinalIgnoreCase);
-
     public TimeSpan HandshakeTimeout { get; private init; } = DefaultHandshakeTimeout;
 
     public X509RevocationMode RevocationMode { get; private init; } = X509RevocationMode.NoCheck;
@@ -69,9 +64,12 @@ sealed class TlsSettings
             throw new InvalidOperationException(
                 $"{SectionName}:ClientCaThumbprints is required: the thumbprint of the CA that issues client certificates.");
         }
-        foreach (var value in ReadList(section.GetSection("AllowedClientThumbprints")))
+        if (ReadList(section.GetSection("AllowedClientThumbprints")).Count > 0)
         {
-            _ = settings.AllowedClientThumbprints.Add(NormalizeThumbprint(value, "AllowedClientThumbprints"));
+            // Earlier versions; the allowed client certificates are now in the database.
+            throw new InvalidOperationException(
+                $"{SectionName}:AllowedClientThumbprints is no longer used; add the client certificates with 'usbipd client add' " +
+                "and remove the setting from appsettings.json.");
         }
         return settings;
     }

@@ -5,6 +5,7 @@
 using System.Net.Security;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using Usbipd.Data;
 
 namespace Usbipd;
 
@@ -18,9 +19,10 @@ sealed class TlsServerAuthenticator : IDisposable
     static readonly StoreName[] CaCertificateStores = [StoreName.Root, StoreName.CertificateAuthority, StoreName.My];
 
     /// <exception cref="InvalidOperationException">A configured certificate is missing or unusable.</exception>
-    public TlsServerAuthenticator(TlsSettings settings, ILogger logger)
+    public TlsServerAuthenticator(TlsSettings settings, IClientAllowList allowList, ILogger logger)
     {
         Settings = settings;
+        AllowList = allowList;
         Logger = logger;
 
         ServerCertificate = FindCertificate(settings.ServerCertificateThumbprint, ServerCertificateStores)
@@ -45,6 +47,7 @@ sealed class TlsServerAuthenticator : IDisposable
     }
 
     readonly TlsSettings Settings;
+    readonly IClientAllowList AllowList;
     readonly ILogger Logger;
     readonly SslServerAuthenticationOptions Options;
 
@@ -117,10 +120,22 @@ sealed class TlsServerAuthenticator : IDisposable
             return false;
         }
 
-        if ((Settings.AllowedClientThumbprints.Count > 0) && !Settings.AllowedClientThumbprints.Contains(clientCertificate.Thumbprint))
+        bool allowed;
+        try
+        {
+            allowed = AllowList.IsAllowed(clientCertificate.Thumbprint);
+        }
+        catch (Exception ex) when (UserStore.IsDatabaseError(ex))
+        {
+            // No connections while the allow-list cannot be read.
+            Logger.ClientCertificateRejected(clientCertificate.Subject, clientCertificate.Thumbprint,
+                $"the client certificate list cannot be read from the database: {ex.Message}");
+            return false;
+        }
+        if (!allowed)
         {
             Logger.ClientCertificateRejected(clientCertificate.Subject, clientCertificate.Thumbprint,
-                "not listed in usbipd:Tls:AllowedClientThumbprints");
+                "not on the client certificate list, or disabled ('usbipd client list')");
             return false;
         }
         return true;

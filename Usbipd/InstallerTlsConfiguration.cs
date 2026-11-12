@@ -102,7 +102,7 @@ static class InstallerTlsConfiguration
         var configuration = new ConfigurationBuilder().AddJsonStream(stream).Build();
         _ = SessionSettings.Read(configuration);
         var settings = TlsSettings.Read(configuration);
-        using var authenticator = new TlsServerAuthenticator(settings, NullLogger.Instance);
+        using var authenticator = new TlsServerAuthenticator(settings, EmptyClientAllowList.Instance, NullLogger.Instance);
     }
 
     static JsonObject Load(string path)

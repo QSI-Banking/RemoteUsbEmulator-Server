@@ -23,6 +23,8 @@ sealed class UsbipdDbContext(DbContextOptions<UsbipdDbContext> options) : DbCont
     public DbSet<Attachment> Attachments => Set<Attachment>();
 
     public DbSet<PolicyRuleEntry> PolicyRules => Set<PolicyRuleEntry>();
+
+    public DbSet<ClientCertificate> ClientCertificates => Set<ClientCertificate>();
     public DbSet<AdminAuditEntry> AdminAudit => Set<AdminAuditEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -99,6 +101,18 @@ sealed class UsbipdDbContext(DbContextOptions<UsbipdDbContext> options) : DbCont
             _ = entity.HasIndex(p => p.ServerName);
             _ = entity.Property(p => p.CreatedUtc).HasColumnType("datetime2");
             _ = entity.Property(p => p.CreatedBy).HasMaxLength(256).IsRequired();
+        });
+
+        _ = modelBuilder.Entity<ClientCertificate>(entity =>
+        {
+            _ = entity.ToTable("ClientCertificates");
+            _ = entity.Property(c => c.Thumbprint).HasMaxLength(40).IsFixedLength().IsUnicode(false).IsRequired();
+            _ = entity.HasIndex(c => c.Thumbprint).IsUnique();
+            _ = entity.Property(c => c.Name).HasMaxLength(256).IsRequired();
+            _ = entity.Property(c => c.Subject).HasMaxLength(400);
+            _ = entity.Property(c => c.NotAfterUtc).HasColumnType("datetime2");
+            _ = entity.Property(c => c.CreatedUtc).HasColumnType("datetime2");
+            _ = entity.Property(c => c.CreatedBy).HasMaxLength(256).IsRequired();
         });
 
         _ = modelBuilder.Entity<AdminAuditEntry>(entity =>

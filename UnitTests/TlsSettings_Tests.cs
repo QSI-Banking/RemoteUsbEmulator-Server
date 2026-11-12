@@ -39,9 +39,15 @@ sealed class TlsSettings_Tests
         Assert.AreEqual(ServerThumbprint, settings.ServerCertificateThumbprint);
         Assert.HasCount(1, settings.ClientCaThumbprints);
         Assert.IsTrue(settings.ClientCaThumbprints.Contains(CaThumbprint));
-        Assert.IsEmpty(settings.AllowedClientThumbprints);
         Assert.AreEqual(TlsSettings.DefaultHandshakeTimeout, settings.HandshakeTimeout);
         Assert.AreEqual(X509RevocationMode.NoCheck, settings.RevocationMode);
+    }
+
+    [TestMethod]
+    public void Read_AllowedClientThumbprints_Moved()
+    {
+        _ = Assert.ThrowsExactly<InvalidOperationException>(() => TlsSettings.Read(CreateConfiguration(
+            ("usbipd:Tls:AllowedClientThumbprints:0", OtherThumbprint))));
     }
 
     [TestMethod]
@@ -51,14 +57,12 @@ sealed class TlsSettings_Tests
             ("usbipd:Tls:Port", "4443"),
             ("usbipd:Tls:ListenAddress", "192.168.1.10"),
             ("usbipd:Tls:ClientCaThumbprints:1", OtherThumbprint),
-            ("usbipd:Tls:AllowedClientThumbprints:0", OtherThumbprint),
             ("usbipd:Tls:HandshakeTimeoutSeconds", "30"),
             ("usbipd:Tls:RevocationMode", "online")));
 
         Assert.AreEqual(4443, settings.Port);
         Assert.AreEqual(IPAddress.Parse("192.168.1.10"), settings.ListenAddress);
         Assert.HasCount(2, settings.ClientCaThumbprints);
-        Assert.IsTrue(settings.AllowedClientThumbprints.Contains(OtherThumbprint));
         Assert.AreEqual(TimeSpan.FromSeconds(30), settings.HandshakeTimeout);
         Assert.AreEqual(X509RevocationMode.Online, settings.RevocationMode);
     }

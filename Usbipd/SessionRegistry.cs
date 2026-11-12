@@ -22,7 +22,7 @@ sealed class SessionRegistry(IConfiguration configuration)
     /// connections that import the same device at the same time, exactly one gets it.
     /// </summary>
     /// <returns>The session (dispose it to release the device), or <see langword="null"/> if another connection holds the device.</returns>
-    public AttachSession? TryClaim(Guid deviceGuid, string userName, IPAddress clientAddress)
+    public AttachSession? TryClaim(Guid deviceGuid, string userName, IPAddress clientAddress, string clientThumbprint)
     {
         lock (Lock)
         {
@@ -30,7 +30,7 @@ sealed class SessionRegistry(IConfiguration configuration)
             {
                 return null;
             }
-            var session = new AttachSession(this, deviceGuid, userName, clientAddress);
+            var session = new AttachSession(this, deviceGuid, userName, clientAddress, clientThumbprint);
             Sessions.Add(deviceGuid, session);
             return session;
         }
@@ -58,12 +58,13 @@ sealed class SessionRegistry(IConfiguration configuration)
 
 sealed class AttachSession : IDisposable
 {
-    internal AttachSession(SessionRegistry registry, Guid deviceGuid, string userName, IPAddress clientAddress)
+    internal AttachSession(SessionRegistry registry, Guid deviceGuid, string userName, IPAddress clientAddress, string clientThumbprint)
     {
         Registry = registry;
         DeviceGuid = deviceGuid;
         UserName = userName;
         ClientAddress = clientAddress;
+        ClientThumbprint = clientThumbprint;
     }
 
     readonly SessionRegistry Registry;
@@ -76,6 +77,11 @@ sealed class AttachSession : IDisposable
     public Guid DeviceGuid { get; }
     public string UserName { get; }
     public IPAddress ClientAddress { get; }
+
+    /// <summary>
+    /// The client certificate of the connection.
+    /// </summary>
+    public string ClientThumbprint { get; }
 
     /// <summary>
     /// Canceled when the session is revoked.
