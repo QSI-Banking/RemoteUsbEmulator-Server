@@ -374,7 +374,11 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
                         await mon.RemoveFilter(filterId);
                     }
                 }
-                catch (ConfigurationManagerException) { }
+                catch (ConfigurationManagerException ex)
+                {
+                    // Windows did not take the device back; it may need to be replugged.
+                    Logger.DeviceRestartFailed(busId, device.InstanceId, ex.Message);
+                }
             }
         }
         catch

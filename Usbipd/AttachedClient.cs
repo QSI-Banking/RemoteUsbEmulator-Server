@@ -3,12 +3,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.Collections.Concurrent;
+using System.ComponentModel;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Channels;
 using Usbipd.Automation;
 using static Usbipd.Interop.Linux;
 using static Usbipd.Interop.UsbIp;
+using static Usbipd.Interop.VBoxUsb;
+using static Usbipd.Tools;
 
 namespace Usbipd;
 
@@ -114,6 +117,71 @@ sealed class AttachedClient
             }
         }, cancellationToken);
 
+        try
+        {
+            await ReceiveRequestsAsync(cancellationToken);
+        }
+        finally
+        {
+            // However the session ends, stop the device's transfers before it is released (see AbortPendingAsync).
+            await AbortPendingTransfersAsync();
+        }
+    }
+
+    static readonly TimeSpan AbortTimeout = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// Leaves the device as a client would after a clean detach: no transfers pending and every interface back on
+    /// alternate setting 0. A client that detaches does this itself (the camera app stops streaming first);
+    /// a revoked session or a lost connection does not, and releasing a device that is still streaming makes
+    /// Windows reset the server's USB devices.
+    /// </summary>
+    async Task AbortPendingTransfersAsync()
+    {
+        var logger = LoggerFactory.CreateLogger<AttachedClient>();
+        foreach (var attachedEndpoint in AttachedEndpoints.Values)
+        {
+            try
+            {
+                await attachedEndpoint.AbortPendingAsync(AbortTimeout);
+            }
+            catch (Exception ex) when (ex is Win32Exception or IOException or ObjectDisposedException or InvalidOperationException)
+            {
+                // The device may already be gone (unplugged); releasing it continues anyway.
+                logger.Debug($"Aborting pending transfers failed: {ex.Message}");
+            }
+        }
+
+        if (ClientContext.AttachedDevice is not { } device)
+        {
+            return;
+        }
+        foreach (var (interfaceNumber, alternateSetting) in ClientContext.SelectedAlternateSettings)
+        {
+            if (alternateSetting == 0)
+            {
+                continue;
+            }
+            logger.Debug($"Selecting alternate setting 0 on interface {interfaceNumber} (was {alternateSetting})");
+            var selectInterface = new UsbSupSelectInterface()
+            {
+                bInterfaceNumber = interfaceNumber,
+                bAlternateSetting = 0,
+            };
+            try
+            {
+                _ = await device.IoControlAsync(SUPUSB_IOCTL.USB_SELECT_INTERFACE, StructToBytes(selectInterface), null);
+            }
+            catch (Exception ex) when (ex is Win32Exception or IOException or ObjectDisposedException or InvalidOperationException)
+            {
+                logger.Debug($"Selecting alternate setting 0 on interface {interfaceNumber} failed: {ex.Message}");
+            }
+        }
+        ClientContext.SelectedAlternateSettings.Clear();
+    }
+
+    async Task ReceiveRequestsAsync(CancellationToken cancellationToken)
+    {
         while (!cancellationToken.IsCancellationRequested)
         {
             var header = await Stream.ReadUsbIpHeaderAsync(cancellationToken);

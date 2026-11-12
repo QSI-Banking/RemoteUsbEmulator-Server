@@ -72,6 +72,9 @@ static partial class LogEvents
     [LoggerMessage(21, LogLevel.Warning, "Client {clientAddress} (user '{userName}'): the user database cannot be reached: {reason}")]
     public static partial void UserDatabaseUnavailable(this ILogger logger, IPAddress clientAddress, string userName, string reason);
 
+    [LoggerMessage(22, LogLevel.Warning, "Device at {busId} ({instanceId}) could not be handed back to Windows after detach: {reason}. It may need to be replugged.")]
+    public static partial void DeviceRestartFailed(this ILogger logger, BusId busId, string instanceId, string reason);
+
     [LoggerMessage(1000, LogLevel.Debug, "{text}")]
     public static partial void Debug(this ILogger logger, string text);
 

@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-only
 
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using Usbipd.Automation;
@@ -37,6 +38,11 @@ sealed partial class ClientContext : IDisposable
     /// Bind GUID of the only device this connection may import.
     /// </summary>
     public Guid? AuthorizedGuid { get; set; }
+    /// <summary>
+    /// Interface number to alternate setting, as selected by the client (SET_INTERFACE) on the attached device.
+    /// A non-zero setting usually means streaming (e.g. a camera); it is put back to 0 before the device is released.
+    /// </summary>
+    public ConcurrentDictionary<byte, byte> SelectedAlternateSettings { get; } = new();
 
     void IDisposable.Dispose()
     {

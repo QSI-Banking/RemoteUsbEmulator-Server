@@ -26,6 +26,7 @@ sealed class AttachedEndpoint
         Logger.Debug("Endpoint created");
 
         Stream = clientContext.Stream;
+        ClientContext = clientContext;
         Device = clientContext.AttachedDevice ?? throw new ArgumentException($"{nameof(ClientContext.AttachedDevice)} is null");
 
         Pcap = pcap;
@@ -52,6 +53,7 @@ sealed class AttachedEndpoint
     readonly byte RawEndpoint;
     readonly PcapNg Pcap;
     readonly Stream Stream;
+    readonly ClientContext ClientContext;
     readonly Channel<RequestReply> ReplyChannel;
     readonly DeviceFile Device;
     long InterlockedSubmits;
@@ -280,6 +282,8 @@ sealed class AttachedEndpoint
                 Logger.Debug($"Trapped SET_CONFIGURATION: {setConfig.bConfigurationValue}");
             }
             _ = await Device.IoControlAsync(SUPUSB_IOCTL.USB_SET_CONFIG, StructToBytes(setConfig), null);
+            // A new configuration starts with alternate setting 0 on every interface.
+            ClientContext.SelectedAlternateSettings.Clear();
             ioctl = Task.CompletedTask;
         }
         else if ((basic.ep == 0)
@@ -297,6 +301,7 @@ sealed class AttachedEndpoint
                 Logger.Debug($"Trapped SET_INTERFACE: {selectInterface.bInterfaceNumber} -> {selectInterface.bAlternateSetting}");
             }
             _ = await Device.IoControlAsync(SUPUSB_IOCTL.USB_SELECT_INTERFACE, StructToBytes(selectInterface), null);
+            ClientContext.SelectedAlternateSettings[selectInterface.bInterfaceNumber] = selectInterface.bAlternateSetting;
             ioctl = Task.CompletedTask;
         }
         else if ((basic.ep == 0)
@@ -475,6 +480,33 @@ sealed class AttachedEndpoint
     // Of course, if the SUBMIT completion wins the race, it is still possible that we abort more often than required.
     // This cannot be avoided, and is not a problem either. The normal scenario is handled optimally this way.
     // It is much better than abort for every UNLINK.
+
+    /// <summary>
+    /// Cancels the transfers still pending on this endpoint and waits (bounded) until they complete.
+    /// A client that detaches unlinks its transfers first; a session that is revoked (time limit, user removed)
+    /// or a lost connection does not. Without this, the device would be closed and restarted while VBoxUSB
+    /// still has transfers in flight (e.g. a streaming camera), which makes Windows reset the server's USB devices.
+    /// </summary>
+    public async Task AbortPendingAsync(TimeSpan timeout)
+    {
+        if (((RawEndpoint & 0x0f) == 0) || (Interlocked.Read(ref InterlockedSubmits) == 0))
+        {
+            // Nothing in flight, or the default control pipe (which cannot be aborted).
+            return;
+        }
+        Logger.Debug("Aborting pending transfers");
+        var clearEndpoint = new UsbSupClearEndpoint()
+        {
+            bEndpoint = RawEndpoint,
+        };
+        _ = await Device.IoControlAsync(SUPUSB_IOCTL.USB_ABORT_ENDPOINT, StructToBytes(clearEndpoint), null);
+
+        var elapsed = System.Diagnostics.Stopwatch.StartNew();
+        while ((Interlocked.Read(ref InterlockedSubmits) > 0) && (elapsed.Elapsed < timeout))
+        {
+            await Task.Delay(10);
+        }
+    }
 
     public async Task HandleUnlinkAsync()
     {
