@@ -5,6 +5,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -22,12 +23,16 @@ public static class CustomActions
     const string ClientCaProperty = "TLS_CLIENT_CA";
     const string SessionMaxMinutesProperty = "SESSION_MAX_MINUTES";
     const string DefaultSessionMaxMinutes = "10";
+    const string SqlServerProperty = "SQL_SERVER";
+    const string SqlDatabaseProperty = "SQL_DATABASE";
+    const string SqlTrustProperty = "SQL_TRUST_SERVER_CERT";
+    const string DefaultSqlDatabase = "usbipd";
     const string DefaultPort = "3241";
 
     const string ServerAuthenticationOid = "1.3.6.1.5.5.7.3.1";
 
     /// <summary>
-    /// Presets TLS_PORT, TLS_SERVER_CERT, TLS_CLIENT_CA and SESSION_MAX_MINUTES from an existing appsettings.json,
+    /// Presets TLS_PORT, TLS_SERVER_CERT, TLS_CLIENT_CA, SESSION_MAX_MINUTES and the SQL_* properties from an existing appsettings.json,
     /// unless they were passed on the command line. Runs in both the UI and the execute sequence,
     /// so a silent upgrade keeps the current settings and the firewall rule keeps the current port.
     /// </summary>
@@ -38,6 +43,7 @@ public static class CustomActions
         string server = null;
         string ca = null;
         string sessionMinutes = null;
+        string connectionString = null;
         try
         {
             var folder = session["APPLICATIONFOLDER"];
@@ -50,6 +56,7 @@ public static class CustomActions
                 server = Text(Child(tls, "ServerCertificateThumbprint"));
                 ca = Text(Child(tls, "ClientCaThumbprints"));
                 sessionMinutes = Text(Child(Child(Child(root, "usbipd"), "Session"), "MaxDurationMinutes"));
+                connectionString = Text(Child(Child(root, "ConnectionStrings"), "Usbipd"));
                 session.Log($"ReadTlsSettings: read {path}");
             }
         }
@@ -62,6 +69,12 @@ public static class CustomActions
         SetIfEmpty(session, ServerCertificateProperty, server);
         SetIfEmpty(session, ClientCaProperty, ca);
         SetIfEmpty(session, SessionMaxMinutesProperty, string.IsNullOrWhiteSpace(sessionMinutes) ? DefaultSessionMaxMinutes : sessionMinutes);
+
+        // An empty SQL_SERVER keeps the connection string as it is (usbipd only replaces it when a server is given).
+        var (sqlServer, sqlDatabase, sqlTrust) = ParseConnectionString(session, connectionString);
+        SetIfEmpty(session, SqlServerProperty, sqlServer);
+        SetIfEmpty(session, SqlDatabaseProperty, string.IsNullOrWhiteSpace(sqlDatabase) ? DefaultSqlDatabase : sqlDatabase);
+        SetIfEmpty(session, SqlTrustProperty, sqlTrust ? "1" : null);
         return ActionResult.Success;
     }
 
@@ -142,6 +155,30 @@ public static class CustomActions
             text = text.Replace('[', '(').Replace(']', ')');
             using var record = new Record(property, order++, certificate.Thumbprint, text);
             view.InsertTemporary(record);
+        }
+    }
+
+    /// <summary>
+    /// Server, database and TrustServerCertificate from a SqlClient connection string (any synonym of the keywords).
+    /// </summary>
+    static (string Server, string Database, bool Trust) ParseConnectionString(Session session, string connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            return (null, null, false);
+        }
+        try
+        {
+            var builder = new DbConnectionStringBuilder { ConnectionString = connectionString };
+            string Get(params string[] keys) => keys.Where(builder.ContainsKey).Select(k => Convert.ToString(builder[k], CultureInfo.InvariantCulture)).FirstOrDefault();
+            var trust = Get("TrustServerCertificate", "Trust Server Certificate");
+            return (Get("Server", "Data Source", "Address", "Addr", "Network Address"), Get("Database", "Initial Catalog"),
+                string.Equals(trust, "true", StringComparison.OrdinalIgnoreCase) || trust == "1");
+        }
+        catch (ArgumentException ex)
+        {
+            session.Log($"ReadTlsSettings: cannot parse the connection string: {ex.Message}");
+            return (null, null, false);
         }
     }
 

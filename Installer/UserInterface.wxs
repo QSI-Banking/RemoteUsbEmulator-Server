@@ -343,13 +343,12 @@ SPDX-License-Identifier: GPL-3.0-only
                     <Publish Event="NewDialog" Value="Update" Condition="InstallMode = &quot;Update&quot;" />
                 </Control>
                 <Control
-                    Id="Install" Type="PushButton" X="$(var.WizardButtonX2)" Y="$(var.WizardButtonY)" Width="$(var.ButtonW)" Height="$(var.ButtonH)"
-                    ElevationShield="yes"
+                    Id="Next" Type="PushButton" X="$(var.WizardButtonX2)" Y="$(var.WizardButtonY)" Width="$(var.ButtonW)" Height="$(var.ButtonH)"
                     Default="yes"
-                    Text="$(var.ButtonInstallText)"
+                    Text="$(var.ButtonNextText)"
                     >
                     <Publish Event="SpawnDialog" Value="TlsIncomplete" Condition="NOT ($(var.TlsComplete))" />
-                    <Publish Event="EndDialog" Value="Return" Condition="$(var.TlsComplete)" />
+                    <Publish Event="NewDialog" Value="Database" Condition="$(var.TlsComplete)" />
                 </Control>
                 <Control
                     Id="Cancel" Type="PushButton" X="$(var.WizardButtonX3)" Y="$(var.WizardButtonY)" Width="$(var.ButtonW)" Height="$(var.ButtonH)"
@@ -386,6 +385,74 @@ SPDX-License-Identifier: GPL-3.0-only
                     Id="Hint" Type="Text" X="30" Y="196" Width="310" Height="34" TabSkip="yes" NoPrefix="yes"
                     Text="{\Caption}Import the certificates into the Local Computer stores first. Silent install: TLS_PORT, TLS_SERVER_CERT and TLS_CLIENT_CA (thumbprints), SESSION_MAX_MINUTES (1-1440)."
                     />
+            </Dialog>
+
+            <?define DatabaseComplete="SQL_SERVER AND SQL_DATABASE" ?>
+
+            <!--
+            SQL Server for users, devices and audit. Windows authentication only: the service connects as its account
+            (NT AUTHORITY\SYSTEM on the same machine, DOMAIN\COMPUTER$ to a remote server), administrators as themselves.
+            -->
+            <Dialog Id="Database" Width="$(var.WizardW)" Height="$(var.WizardH)" Title="$(var.WizardTitle)">
+                <!-- dialog -->
+                <Control Id="BannerBitmap" Type="Bitmap" X="$(var.BannerBitmapX)" Y="$(var.BannerBitmapY)" Width="$(var.BannerBitmapW)" Height="$(var.BannerBitmapH)" TabSkip="yes" Text="banner.png" />
+
+                <!-- wizard -->
+                <Control Id="BottomLine" Type="Line" X="0" Y="$(var.WizardLineY)" Width="$(var.WizardLineW)" Height="0" />
+                <Control
+                    Id="Back" Type="PushButton" X="$(var.WizardButtonX1)" Y="$(var.WizardButtonY)" Width="$(var.ButtonW)" Height="$(var.ButtonH)"
+                    Text="$(var.ButtonBackText)"
+                    >
+                    <Publish Event="NewDialog" Value="Tls" />
+                </Control>
+                <Control
+                    Id="Install" Type="PushButton" X="$(var.WizardButtonX2)" Y="$(var.WizardButtonY)" Width="$(var.ButtonW)" Height="$(var.ButtonH)"
+                    ElevationShield="yes"
+                    Default="yes"
+                    Text="$(var.ButtonInstallText)"
+                    >
+                    <Publish Event="SpawnDialog" Value="DatabaseIncomplete" Condition="NOT ($(var.DatabaseComplete))" />
+                    <Publish Event="EndDialog" Value="Return" Condition="$(var.DatabaseComplete)" />
+                </Control>
+                <Control
+                    Id="Cancel" Type="PushButton" X="$(var.WizardButtonX3)" Y="$(var.WizardButtonY)" Width="$(var.ButtonW)" Height="$(var.ButtonH)"
+                    Cancel="yes"
+                    Text="$(var.ButtonCancelText)"
+                    >
+                    <Publish Event="EndDialog" Value="Exit" />
+                </Control>
+
+                <!-- content -->
+                <Control
+                    Id="Title" Type="Text" X="$(var.TitleX)" Y="$(var.TitleY)" Width="$(var.TitleW)" Height="$(var.TitleH)" TabSkip="yes"
+                    Text="{\Title}Database" NoPrefix="yes"
+                    />
+                <Control
+                    Id="Content" Type="Text" X="$(var.ContentX)" Y="72" Width="$(var.ContentW)" Height="26" TabSkip="yes" NoPrefix="yes"
+                    Text="{\Caption}Users, devices and the audit log are kept in SQL Server, using Windows authentication."
+                    />
+
+                <Control Id="ServerLabel" Type="Text" X="30" Y="104" Width="110" Height="13" TabSkip="yes" Text="{\Caption}SQL &amp;Server (instance):" />
+                <Control Id="Server" Type="Edit" X="140" Y="102" Width="200" Height="15" Property="SQL_SERVER" />
+
+                <Control Id="DatabaseLabel" Type="Text" X="30" Y="124" Width="110" Height="13" TabSkip="yes" Text="{\Caption}&amp;Database:" />
+                <Control Id="DatabaseName" Type="Edit" X="140" Y="122" Width="200" Height="15" Property="SQL_DATABASE" />
+
+                <Control Id="Trust" Type="CheckBox" X="30" Y="146" Width="310" Height="15" Property="SQL_TRUST_SERVER_CERT" CheckBoxValue="1"
+                    Text="{\Caption}&amp;Trust the SQL Server certificate without validation (development only)" />
+
+                <Control
+                    Id="Hint" Type="Text" X="30" Y="168" Width="310" Height="60" TabSkip="yes" NoPrefix="yes"
+                    Text="{\Caption}Example: .\SQLEXPRESS or sqlprod01. The service connects as NT AUTHORITY\SYSTEM (local SQL Server) or as this computer's domain account (remote). After installing, create the schema with: usbipd db migrate. Silent install: SQL_SERVER, SQL_DATABASE, SQL_TRUST_SERVER_CERT=1."
+                    />
+            </Dialog>
+
+            <Dialog Id="DatabaseIncomplete" Width="260" Height="85" Title="$(var.WizardTitle)" NoMinimize="yes">
+                <Control Id="Text" Type="Text" X="15" Y="15" Width="230" Height="40" TabSkip="no" NoPrefix="yes"
+                    Text="{\Body}Enter the SQL Server and the database name." />
+                <Control Id="OK" Type="PushButton" X="180" Y="58" Width="66" Height="20" Default="yes" Cancel="yes" Text="{\Caption}&amp;OK">
+                    <Publish Event="EndDialog" Value="Return" />
+                </Control>
             </Dialog>
 
             <Dialog Id="TlsIncomplete" Width="260" Height="85" Title="$(var.WizardTitle)" NoMinimize="yes">

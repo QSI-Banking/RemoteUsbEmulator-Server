@@ -63,7 +63,7 @@ static partial class ConsoleTools
 
     public static string Unwrap(this string text)
     {
-        return text.Replace("\r\n", "\n").Replace("\\\n", "");
+        return text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\\\n", "", StringComparison.Ordinal);
     }
 
     public static void WriteTruncated(this IConsole console, string text, int width, bool fill)

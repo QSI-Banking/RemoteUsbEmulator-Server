@@ -7,12 +7,13 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Usbipd;
 
 /// <summary>
-/// 'usbipd installer configure_tls': the MSI runs this (deferred, as SYSTEM) to write the TLS and session settings chosen
+/// 'usbipd installer configure': the MSI runs this (deferred, as SYSTEM) to write the TLS, session and database settings chosen
 /// in the installer into appsettings.json next to usbipd.exe. Settings that are not passed are kept, and the
 /// result is validated exactly as the service validates it at start, so a bad choice fails the installation.
 /// </summary>
@@ -21,7 +22,7 @@ static class InstallerTlsConfiguration
     static string SettingsPath => Path.Combine(AppContext.BaseDirectory, "appsettings.json");
 
     public static ExitCode Configure(IConsole console, string? port, string? serverCertificate, string? clientCertificateAuthorities,
-        string? sessionMaxMinutes)
+        string? sessionMaxMinutes, string? sqlServer, string? sqlDatabase, string? sqlTrustServerCertificate)
     {
         try
         {
@@ -61,6 +62,20 @@ static class InstallerTlsConfiguration
                     throw new InvalidOperationException($"Session limit '{sessionMaxMinutes}' must be a number of minutes from 1 to 1440.");
                 }
                 GetObject(GetObject(root, "usbipd"), "Session")["MaxDurationMinutes"] = minutes;
+            }
+
+            if (!string.IsNullOrWhiteSpace(sqlServer))
+            {
+                // Windows authentication only: the service connects as its own account, the CLI as the administrator.
+                var builder = new SqlConnectionStringBuilder
+                {
+                    DataSource = sqlServer.Trim(),
+                    InitialCatalog = string.IsNullOrWhiteSpace(sqlDatabase) ? "usbipd" : sqlDatabase.Trim(),
+                    IntegratedSecurity = true,
+                    Encrypt = SqlConnectionEncryptOption.Mandatory,
+                    TrustServerCertificate = sqlTrustServerCertificate?.Trim() is "1" or "true" or "True",
+                };
+                GetObject(root, "ConnectionStrings")[Data.Database.ConnectionStringName] = builder.ConnectionString;
             }
 
             var json = Serialize(root);

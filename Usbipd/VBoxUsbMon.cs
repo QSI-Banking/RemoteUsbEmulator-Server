@@ -31,7 +31,7 @@ sealed partial class VBoxUsbMon : IDisposable
 
     public static bool IsServiceInstalled()
     {
-        return ServiceController.GetDevices().Any(sc => sc.ServiceName.Equals(USBMON_SERVICE_NAME_W, StringComparison.InvariantCultureIgnoreCase));
+        return ServiceController.GetDevices().Any(sc => sc.ServiceName.Equals(USBMON_SERVICE_NAME_W, StringComparison.OrdinalIgnoreCase));
     }
 
     public static bool IsVersionSupported(UsbSupVersion version)

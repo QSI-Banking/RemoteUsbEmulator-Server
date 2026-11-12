@@ -96,7 +96,7 @@ SPDX-License-Identifier: GPL-3.0-only
             </Component>
 
             <!--
-            Holds the TLS settings, written by 'usbipd installer configure_tls' (ConfigureTls). Never overwritten, and kept on uninstall and upgrade.
+            Holds the TLS, session and database settings, written by 'usbipd installer configure' (ConfigureTls). Never overwritten, and kept on uninstall and upgrade.
             -->
             <Component Id="appsettings.json" NeverOverwrite="yes" Permanent="yes">
                 <File Id="appsettings.json" Name="appsettings.json" />
@@ -190,9 +190,9 @@ SPDX-License-Identifier: GPL-3.0-only
 
         <!--
         TLS settings, chosen in the TLS dialog or passed on the command line (silent install):
-            msiexec /i usbipd-win.msi /qn TLS_PORT=3241 TLS_SERVER_CERT=<thumbprint> TLS_CLIENT_CA=<thumbprint>[,<thumbprint>...] SESSION_MAX_MINUTES=10
+            msiexec /i usbipd-win.msi /qn TLS_PORT=3241 TLS_SERVER_CERT=<thumbprint> TLS_CLIENT_CA=<thumbprint>[,<thumbprint>...] SESSION_MAX_MINUTES=10 SQL_SERVER=sqlprod01 SQL_DATABASE=usbipd [SQL_TRUST_SERVER_CERT=1]
         Values that are not passed are read from the existing appsettings.json (ReadTlsSettings), so a silent upgrade keeps them.
-        usbipd.exe writes and validates appsettings.json itself; an invalid choice fails (and rolls back) the installation.
+        'usbipd installer configure' writes and validates appsettings.json; an invalid choice fails (and rolls back) the installation.
         -->
         <Property Id="TLS_PORT" Secure="yes" />
         <!-- the TLS dialog drop-downs are filled at run time (ListCertificates), the table must exist -->
@@ -201,13 +201,21 @@ SPDX-License-Identifier: GPL-3.0-only
         <Property Id="TLS_CLIENT_CA" Secure="yes" />
         <!-- minutes after which an attached device is detached (usbipd:Session:MaxDurationMinutes, 1-1440, default 10) -->
         <Property Id="SESSION_MAX_MINUTES" Secure="yes" />
+        <!-- SQL Server for users and devices (Windows authentication); written as ConnectionStrings:Usbipd -->
+        <Property Id="SQL_SERVER" Secure="yes" />
+        <Property Id="SQL_DATABASE" Secure="yes" />
+        <!-- 1 = trust the SQL Server certificate without validation (development only) -->
+        <Property Id="SQL_TRUST_SERVER_CERT" Secure="yes" />
 
         <Binary Id="UsbipdTlsCA" SourceFile="$(var.Usbipd.InstallerActions.TargetDir)Usbipd.InstallerActions.CA.dll" />
         <CustomAction Id="ReadTlsSettings" BinaryRef="UsbipdTlsCA" DllEntry="ReadTlsSettings" Execute="immediate" Return="check" />
         <CustomAction Id="ListCertificates" BinaryRef="UsbipdTlsCA" DllEntry="ListCertificates" Execute="immediate" Return="ignore" />
 
-        <SetProperty Id="ConfigureTls" Value="&quot;[#usbipd.exe]&quot; installer configure_tls --port &quot;[TLS_PORT]&quot; --server-certificate &quot;[TLS_SERVER_CERT]&quot; --client-ca &quot;[TLS_CLIENT_CA]&quot; --session-max-minutes &quot;[SESSION_MAX_MINUTES]&quot;" Sequence="execute" Before="ConfigureTls" Condition="$(var.InstallOrUpdateOrRepair)" />
+        <!-- Two calls: the CustomAction Target column (the command line) is limited to 255 characters. -->
+        <SetProperty Id="ConfigureTls" Value="&quot;[#usbipd.exe]&quot; installer configure --port &quot;[TLS_PORT]&quot; --server-certificate &quot;[TLS_SERVER_CERT]&quot; --client-ca &quot;[TLS_CLIENT_CA]&quot; --session-max-minutes &quot;[SESSION_MAX_MINUTES]&quot;" Sequence="execute" Before="ConfigureTls" Condition="$(var.InstallOrUpdateOrRepair)" />
         <CustomAction Id="ConfigureTls" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixQuietExec" Return="check" Impersonate="no" Execute="deferred" />
+        <SetProperty Id="ConfigureDatabase" Value="&quot;[#usbipd.exe]&quot; installer configure --sql-server &quot;[SQL_SERVER]&quot; --sql-database &quot;[SQL_DATABASE]&quot; --sql-trust-server-certificate &quot;[SQL_TRUST_SERVER_CERT]&quot;" Sequence="execute" Before="ConfigureDatabase" Condition="$(var.InstallOrUpdateOrRepair)" />
+        <CustomAction Id="ConfigureDatabase" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixQuietExec" Return="check" Impersonate="no" Execute="deferred" />
 
         <InstallUISequence>
             <Custom Action="ReadTlsSettings" After="CostFinalize" />
@@ -230,7 +238,8 @@ SPDX-License-Identifier: GPL-3.0-only
             <Custom Action="InstallMonitor" Before="InstallServices" Condition="$(var.InstallOrUpdateOrRepair)" />
 
             <!-- before the service is started, which reads appsettings.json -->
-            <Custom Action="ConfigureTls" Before="TryStartService" Condition="$(var.InstallOrUpdateOrRepair)" />
+            <Custom Action="ConfigureTls" Before="ConfigureDatabase" Condition="$(var.InstallOrUpdateOrRepair)" />
+            <Custom Action="ConfigureDatabase" Before="TryStartService" Condition="$(var.InstallOrUpdateOrRepair)" />
             <Custom Action="TryStartService" After="StartServices" Condition="$(var.InstallOrUpdateOrRepair)" />
             <Custom Action="UpdateDrivers" After="StartServices" Condition="$(var.InstallOrUpdateOrRepair)" />
             <Custom Action="UninstallOldDrivers2" After="StartServices" Condition="$(var.InstallOrUpdateOrRepair)" />

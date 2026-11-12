@@ -15,11 +15,31 @@ SPDX-License-Identifier: GPL-3.0-only
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
     <IsPublishable>true</IsPublishable>
-    <PublishAot>true</PublishAot>
+    <!--
+    Not Native AOT: EF Core and SqlClient (the user database) do not fully support it.
+    Still one usbipd.exe: self-contained single file, so the installer and the PATH stay as they are.
+    -->
+    <PublishAot>false</PublishAot>
+    <IsAotCompatible>false</IsAotCompatible>
+    <IsTrimmable>false</IsTrimmable>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <!-- SqlClient needs culture data -->
+    <InvariantGlobalization>false</InvariantGlobalization>
     <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
-    <OptimizationPreference>Speed</OptimizationPreference>
 
     <AssemblyName>usbipd</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(EfDesign)' == 'true'">
+    <!-- dotnet ef only: the repository-wide pins (e.g. Roslyn for Win32ResourceGenerator) conflict with EF Core's design package -->
+    <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
+    <NuGetAudit>false</NuGetAudit>
+    <!-- dotnet ef loads the app through its deps.json (the repository default turns it off) -->
+    <GenerateDependencyFile>true</GenerateDependencyFile>
+    <!-- keep packages.lock.json as the shipped build needs it; the design-time lock file goes to obj -->
+    <NuGetLockFilePath>$(BaseIntermediateOutputPath)packages.efdesign.lock.json</NuGetLockFilePath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -60,6 +80,12 @@ SPDX-License-Identifier: GPL-3.0-only
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+    Design-time only (dotnet ef), so Roslyn does not end up in usbipd.exe. Set the environment variable EfDesign=true
+    before running dotnet ef (see Data\Database.cs).
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" Condition="'$(EfDesign)' == 'true'" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" />
     <PackageReference Include="Microsoft.Windows.CsWin32" PrivateAssets="all" />
     <PackageReference Include="System.CommandLine" />

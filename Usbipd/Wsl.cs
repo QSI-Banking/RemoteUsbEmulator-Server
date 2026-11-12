@@ -107,7 +107,7 @@ static partial class Wsl
             startInfo.ArgumentList.Add("--cd");
             startInfo.ArgumentList.Add(linux.Value.directory);
             // The first argument is the actual command to run within the WSL distribution.
-            if (arguments.First().Contains('/'))
+            if (arguments.First().Contains('/', StringComparison.Ordinal))
             {
                 // If we specified a path, then we don't need a shell.
                 startInfo.ArgumentList.Add("--exec");
@@ -480,7 +480,7 @@ static partial class Wsl
                 // With minimal requirements (bash only) try to connect from WSL to our server.
                 var pingResult = await RunWslAsync((distribution, "/"), null, false, linkedTokenSource.Token, "bash", "-c",
                     $"echo < /dev/tcp/{hostAddress}/{Interop.UsbIp.USBIP_PORT}");
-                if (pingResult.StandardError.Contains("refused"))
+                if (pingResult.StandardError.Contains("refused", StringComparison.Ordinal))
                 {
                     // If the output contains "refused", then the test was executed and failed, irrespective of the exit code.
                     result = FirewallCheckResult.Fail;
@@ -546,7 +546,7 @@ static partial class Wsl
             // Prepend "WSL", so the user does not confused over "usbip: ... " vs our own "usbipd: ...".
             // We output as "normal text" (although we could filter on "error:").
             console.Out.WriteLine("WSL " + line);
-            if (line.Contains("Device busy"))
+            if (line.Contains("Device busy", StringComparison.Ordinal))
             {
                 // We have already checked that the device is not attached to some other client.
                 console.ReportWarning(

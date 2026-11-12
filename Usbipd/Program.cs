@@ -145,7 +145,7 @@ static class Program
     {
         try
         {
-            return complete()?.Where(s => s.Label.StartsWith(completionContext.WordToComplete)) ?? [];
+            return complete()?.Where(s => s.Label.StartsWith(completionContext.WordToComplete, StringComparison.Ordinal)) ?? [];
         }
 #pragma warning disable CA1031 // Do not catch general exception types (justification: completions are supposed to help, not crash)
         catch
@@ -899,6 +899,20 @@ static class Program
         }
         {
             //
+            //  db migrate
+            //
+            var dbCommand = new Command("db", "Manage the database\0" +
+                "Commands to manage the SQL Server database (ConnectionStrings:Usbipd in appsettings.json).");
+            var migrateCommand = new Command("migrate", "Create or upgrade the database schema\0" +
+                "Applies the pending schema migrations. Run as an account that may change the schema, " +
+                "or let a DBA run Database\\usbipd.sql instead.");
+            migrateCommand.SetAction(async (parseResult, cancellationToken) => (int)
+                await Data.DatabaseCommands.MigrateAsync(console, cancellationToken));
+            dbCommand.Subcommands.Add(migrateCommand);
+            rootCommand.Subcommands.Add(dbCommand);
+        }
+        {
+            //
             //  installer
             //
             var installCommand = new Command("installer")
@@ -926,7 +940,8 @@ static class Program
             AddInstallerSubcommand("enable_forced", commandHandlers.InstallerEnableForced);
             {
                 //
-                //  installer configure_tls [--port <PORT>] [--server-certificate <THUMBPRINT>] [--client-ca <THUMBPRINTS>] [--session-max-minutes <MINUTES>]
+                //  installer configure [--port <PORT>] [--server-certificate <THUMBPRINT>] [--client-ca <THUMBPRINTS>] [--session-max-minutes <MINUTES>]
+                //                      [--sql-server <SERVER>] [--sql-database <NAME>] [--sql-trust-server-certificate <1|0>]
                 //
                 var portOption = new Option<string>("--port")
                 {
@@ -944,17 +959,33 @@ static class Program
                 {
                     Description = "Minutes after which an attached device is detached",
                 };
-                var configureTlsCommand = new Command("configure_tls")
+                var sqlServerOption = new Option<string>("--sql-server")
+                {
+                    Description = "SQL Server (instance) name; replaces the connection string",
+                };
+                var sqlDatabaseOption = new Option<string>("--sql-database")
+                {
+                    Description = "Database name (default usbipd)",
+                };
+                var sqlTrustOption = new Option<string>("--sql-trust-server-certificate")
+                {
+                    Description = "1 to trust the SQL Server certificate without validation (development only)",
+                };
+                var configureCommand = new Command("configure")
                 {
                     portOption,
                     serverCertificateOption,
                     clientCaOption,
                     sessionMaxMinutesOption,
+                    sqlServerOption,
+                    sqlDatabaseOption,
+                    sqlTrustOption,
                 };
-                configureTlsCommand.SetAction(parseResult => (int)InstallerTlsConfiguration.Configure(console,
+                configureCommand.SetAction(parseResult => (int)InstallerTlsConfiguration.Configure(console,
                     parseResult.GetValue(portOption), parseResult.GetValue(serverCertificateOption), parseResult.GetValue(clientCaOption),
-                    parseResult.GetValue(sessionMaxMinutesOption)));
-                installCommand.Subcommands.Add(configureTlsCommand);
+                    parseResult.GetValue(sessionMaxMinutesOption), parseResult.GetValue(sqlServerOption),
+                    parseResult.GetValue(sqlDatabaseOption), parseResult.GetValue(sqlTrustOption)));
+                installCommand.Subcommands.Add(configureCommand);
             }
 
             rootCommand.Subcommands.Add(installCommand);
