@@ -90,6 +90,15 @@ sealed partial class Server : BackgroundService
             throw;
         }
         var tlsAuthenticator = TlsAuthenticator;
+        try
+        {
+            _ = SessionSettings.Read(Configuration);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Logger.ConfigurationError(ex.Message);
+            throw;
+        }
 
         // Cleanup any left-overs in case the previous instance crashed.
         _ = UsbipdRegistry.Instance.SetAllDevicesAsDetached();

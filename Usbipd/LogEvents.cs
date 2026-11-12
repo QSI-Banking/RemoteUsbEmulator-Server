@@ -54,6 +54,18 @@ static partial class LogEvents
     [LoggerMessage(15, LogLevel.Critical, "TLS configuration error: {text}")]
     public static partial void TlsConfigurationError(this ILogger logger, string text);
 
+    [LoggerMessage(16, LogLevel.Information, "Session of user '{userName}' on device {busId} from client {clientAddress} ended: {reason}.")]
+    public static partial void SessionRevoked(this ILogger logger, IPAddress clientAddress, string userName, BusId busId, string reason);
+
+    [LoggerMessage(17, LogLevel.Warning, "Client {clientAddress} (user '{userName}') did not request the import within {seconds} s; connection closed.")]
+    public static partial void ClientImportTimeout(this ILogger logger, IPAddress clientAddress, string userName, int seconds);
+
+    [LoggerMessage(18, LogLevel.Warning, "Client {clientAddress} (user '{userName}') requested device at {busId}, which another connection is importing or using; refused.")]
+    public static partial void ClientDeviceBusy(this ILogger logger, IPAddress clientAddress, string userName, BusId busId);
+
+    [LoggerMessage(19, LogLevel.Critical, "Configuration error: {text}")]
+    public static partial void ConfigurationError(this ILogger logger, string text);
+
     [LoggerMessage(1000, LogLevel.Debug, "{text}")]
     public static partial void Debug(this ILogger logger, string text);
 

@@ -21,13 +21,14 @@ using static Usbipd.Interop.UsbIp;
 namespace Usbipd;
 
 sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clientContext, IServiceProvider serviceProvider,
-    IUserAuthenticator userAuthenticator, IUserDeviceMap userDeviceMap)
+    IUserAuthenticator userAuthenticator, IUserDeviceMap userDeviceMap, SessionRegistry sessionRegistry)
 {
     readonly ILogger Logger = logger;
     readonly ClientContext ClientContext = clientContext;
     readonly IServiceProvider ServiceProvider = serviceProvider;
     readonly IUserAuthenticator UserAuthenticator = userAuthenticator;
     readonly IUserDeviceMap UserDeviceMap = userDeviceMap;
+    readonly SessionRegistry SessionRegistry = sessionRegistry;
     readonly Stream Stream = clientContext.Stream;
 
     public async Task RunAsync(CancellationToken cancellationToken)
@@ -47,16 +48,33 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
                     {
                         return;
                     }
-                    opCode = await ReceiveOpCodeAsync(cancellationToken);
-                    if (Logger.IsEnabled(LogLevel.Debug))
+                    // The import must follow within ImportTimeout; an authenticated connection cannot be held open.
+                    byte[] requestedBusId;
+                    using (var importDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
                     {
-                        Logger.Debug($"Received opcode: {opCode}");
+                        importDeadline.CancelAfter(SessionRegistry.Settings.ImportTimeout);
+                        try
+                        {
+                            opCode = await ReceiveOpCodeAsync(importDeadline.Token);
+                            if (Logger.IsEnabled(LogLevel.Debug))
+                            {
+                                Logger.Debug($"Received opcode: {opCode}");
+                            }
+                            if (opCode != OpCode.OP_REQ_IMPORT)
+                            {
+                                throw new ProtocolViolationException($"unexpected opcode {opCode} after authentication");
+                            }
+                            requestedBusId = new byte[SYSFS_BUS_ID_SIZE];
+                            await Stream.ReadMessageAsync(requestedBusId, importDeadline.Token);
+                        }
+                        catch (OperationCanceledException) when (importDeadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                        {
+                            Logger.ClientImportTimeout(ClientContext.ClientAddress, ClientContext.AuthenticatedUser ?? string.Empty,
+                                (int)SessionRegistry.Settings.ImportTimeout.TotalSeconds);
+                            return;
+                        }
                     }
-                    if (opCode != OpCode.OP_REQ_IMPORT)
-                    {
-                        throw new ProtocolViolationException($"unexpected opcode {opCode} after authentication");
-                    }
-                    await HandleRequestImportAsync(cancellationToken);
+                    await HandleRequestImportAsync(requestedBusId, cancellationToken);
                     break;
                 case OpCode.OP_REQ_DEVLIST:
                     // Device enumeration is disabled: clients attach by user name only.
@@ -153,13 +171,11 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
         return true;
     }
 
-    async Task HandleRequestImportAsync(CancellationToken cancellationToken)
+    async Task HandleRequestImportAsync(byte[] requestedBusId, CancellationToken cancellationToken)
     {
         BusId busId;
         {
-            var buf = new byte[SYSFS_BUS_ID_SIZE];
-            await Stream.ReadMessageAsync(buf, cancellationToken);
-            if (!BusId.TryParse(Encoding.UTF8.GetString([.. buf.TakeWhile(b => b != 0)]), out busId))
+            if (!BusId.TryParse(Encoding.UTF8.GetString([.. requestedBusId.TakeWhile(b => b != 0)]), out busId))
             {
                 await SendOpCodeAsync(OpCode.OP_REP_IMPORT, Status.ST_NODEV);
                 return;
@@ -182,6 +198,23 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
             }
             Debug.Assert(device.BusId.HasValue);
             Debug.Assert(device.PersistedGuid.HasValue);
+
+            // The mapping may have changed since OP_REQ_AUTH.
+            if (UserDeviceMap.GetDeviceGuid(ClientContext.AuthenticatedUser) != device.PersistedGuid)
+            {
+                Logger.ClientImportRefused(ClientContext.ClientAddress, ClientContext.AuthenticatedUser, busId);
+                await SendOpCodeAsync(OpCode.OP_REP_IMPORT, Status.ST_NODEV);
+                return;
+            }
+
+            // Per-device lock: one import (and attachment) per device, held until the device is detached.
+            using var session = SessionRegistry.TryClaim(device.PersistedGuid.Value, ClientContext.AuthenticatedUser, ClientContext.ClientAddress);
+            if (session is null)
+            {
+                Logger.ClientDeviceBusy(ClientContext.ClientAddress, ClientContext.AuthenticatedUser, busId);
+                await SendOpCodeAsync(OpCode.OP_REP_IMPORT, Status.ST_DEV_BUSY);
+                return;
+            }
 
             if (device.ClientIPAddress is not null)
             {
@@ -241,7 +274,8 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
                 exportedDevice.Serialize(Stream, false);
 
                 // setup token to free device
-                using var attachedClientTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                // Also canceled when the session is revoked (time limit, user removed, mapping changed).
+                using var attachedClientTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, session.Token);
                 using var cancelEvent = new AutoResetEvent(false);
                 _ = ThreadPool.RegisterWaitForSingleObject(cancelEvent, (state, timedOut) =>
                 {
@@ -292,6 +326,7 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
                     throw new Win32Exception((int)result, nameof(PInvoke.RegNotifyChangeKeyValue));
                 }
 
+                session.StartClock(SessionRegistry.Settings.MaxDuration);
                 await ServiceProvider.GetRequiredService<AttachedClient>().RunAsync(attachedClientTokenSource.Token);
             }
             finally
@@ -303,6 +338,10 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
                 ClientContext.AttachedDevice.Dispose();
 
                 Logger.ClientDetach(ClientContext.ClientAddress, busId, device.InstanceId);
+                if (session.EndReason is { } reason)
+                {
+                    Logger.SessionRevoked(ClientContext.ClientAddress, session.UserName, busId, reason);
+                }
 
                 try
                 {
