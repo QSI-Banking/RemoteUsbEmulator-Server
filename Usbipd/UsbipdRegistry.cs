@@ -4,14 +4,16 @@
 
 using System.Net;
 using System.Security;
-using System.Security.AccessControl;
-using System.Security.Principal;
 using Microsoft.Win32;
 using Usbipd.Automation;
-using Windows.Win32;
 
 namespace Usbipd;
 
+/// <summary>
+/// The registry state of earlier versions (HKLM\SOFTWARE\usbipd-win). Binds, policy rules, attachments and users are now in
+/// SQL Server (see <see cref="Data.BindStore"/> and <see cref="Data.UserStore"/>); this is only read by 'usbipd db import-registry'.
+/// The installer still records the installation folder here.
+/// </summary>
 sealed class UsbipdRegistry : IDisposable
 {
     public static UsbipdRegistry Instance { get => TestInstance ?? field; } = new(Registry.LocalMachine);
@@ -115,70 +117,6 @@ sealed class UsbipdRegistry : IDisposable
         {
             devicesKey.DeleteSubKeyTree(subKeyName, false);
         }
-    }
-
-    public RegistryKey SetDeviceAsAttached(Guid guid, BusId busId, IPAddress address, string stubInstanceId)
-    {
-        using var key = GetDeviceKey(guid, true)
-            ?? throw new UnexpectedResultException($"{nameof(SetDeviceAsAttached)}: Device key not found");
-        var attached = key.CreateSubKey(AttachedName, true, RegistryOptions.Volatile)
-            ?? throw new UnexpectedResultException($"{nameof(SetDeviceAsAttached)}: Unable to create ${AttachedName} subkey");
-        // Allow users that are logged in on the console to delete the key (detach).
-        var registrySecurity = attached.GetAccessControl(AccessControlSections.All);
-        registrySecurity.AddAccessRule(new RegistryAccessRule(new SecurityIdentifier(WellKnownSidType.WinConsoleLogonSid, null),
-            RegistryRights.Delete, AccessControlType.Allow));
-        // Required for Windows 11 (WinConsoleLogonSid is not enough)
-        registrySecurity.AddAccessRule(new RegistryAccessRule(new SecurityIdentifier(WellKnownSidType.InteractiveSid, null),
-            RegistryRights.Delete, AccessControlType.Allow));
-        attached.SetAccessControl(registrySecurity);
-        try
-        {
-            attached.SetValue(BusIdName, busId);
-            attached.SetValue(IPAddressName, address.ToString());
-            attached.SetValue(InstanceIdName, stubInstanceId);
-            return attached;
-        }
-        catch
-        {
-            attached.Dispose();
-            throw;
-        }
-    }
-
-    static bool RemoveAttachedSubKey(RegistryKey deviceKey)
-    {
-        // .NET does not have this functionality: delete a key to which you have rights while
-        // you do not have rights to the containing key. So, we must use the API directly.
-        // Instead of checking the return value we will check if the Attached key is actually gone.
-        _ = PInvoke.RegDeleteKey(deviceKey.Handle, AttachedName);
-        using var attached = deviceKey.OpenSubKey(AttachedName, false);
-        return attached is null;
-    }
-
-    public bool SetDeviceAsDetached(Guid guid)
-    {
-        using var deviceKey = GetDeviceKey(guid, false);
-        return deviceKey is null || RemoveAttachedSubKey(deviceKey);
-    }
-
-    public bool SetAllDevicesAsDetached()
-    {
-        using var devicesKey = GetDevicesKey(false);
-        var deviceKeyNames = devicesKey?.GetSubKeyNames() ?? [];
-        var failure = false;
-        foreach (var deviceKeyName in deviceKeyNames)
-        {
-            using var deviceKey = devicesKey?.OpenSubKey(deviceKeyName, false);
-            if (deviceKey is null)
-            {
-                continue;
-            }
-            if (!RemoveAttachedSubKey(deviceKey))
-            {
-                failure = true;
-            }
-        }
-        return !failure;
     }
 
     /// <summary>

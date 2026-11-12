@@ -71,6 +71,7 @@ sealed class AttachSession : IDisposable
     Timer? ExpiryTimer;
     string? RevokedReason;
     int Disposed;
+    volatile bool Recorded;
 
     public Guid DeviceGuid { get; }
     public string UserName { get; }
@@ -85,6 +86,19 @@ sealed class AttachSession : IDisposable
     /// Why the session was revoked, or <see langword="null"/> if it was not.
     /// </summary>
     public string? EndReason => Volatile.Read(ref RevokedReason);
+
+    /// <summary>
+    /// Whether the attachment is recorded in the database; from then on, deleting the record ('usbipd detach') ends the session.
+    /// </summary>
+    public bool IsRecorded => Recorded;
+
+    /// <summary>
+    /// Call after the attachment record was written.
+    /// </summary>
+    public void MarkRecorded()
+    {
+        Recorded = true;
+    }
 
     /// <summary>
     /// Starts the hard time limit; call it when the device is attached.

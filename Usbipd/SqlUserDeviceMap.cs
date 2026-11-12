@@ -21,13 +21,15 @@ sealed class SqlUserDeviceMap(IConfiguration configuration) : IUserDeviceMap
     {
         using var db = Database.CreateContext(Database.GetConnectionString(Configuration));
         var serverName = UserStore.ServerName;
-        var instanceId = db.UserDevices.AsNoTracking()
+        return db.UserDevices.AsNoTracking()
             .Where(m => m.User!.Name == userName && m.Device!.ServerName == serverName)
-            .Select(m => m.Device!.InstanceId)
+            .Select(m => m.Device!.Bind == null ? (Guid?)null : m.Device.Bind.Id)
             .SingleOrDefault();
-        return instanceId is null
-            ? null
-            : UsbipdRegistry.Instance.GetBoundDevices()
-                .FirstOrDefault(d => string.Equals(d.InstanceId, instanceId, StringComparison.OrdinalIgnoreCase))?.PersistedGuid;
+    }
+
+    /// <exception cref="Microsoft.Data.SqlClient.SqlException">The database cannot be reached.</exception>
+    public IReadOnlySet<Guid> GetAttachedDevices()
+    {
+        return BindStore.GetAttachedGuids();
     }
 }

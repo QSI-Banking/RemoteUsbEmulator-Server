@@ -28,6 +28,8 @@ sealed class SessionRegistry_Tests
     {
         public Dictionary<string, Guid> Map { get; } = new(UserNames.Comparer);
         public Guid? GetDeviceGuid(string userName) => Map.TryGetValue(userName, out var guid) ? guid : null;
+        public HashSet<Guid> Attached { get; } = [];
+        public IReadOnlySet<Guid> GetAttachedDevices() => Attached;
     }
 
     [TestMethod]
@@ -168,5 +170,39 @@ sealed class SessionRegistry_Tests
 
         Assert.AreEqual("the user was removed or the device is no longer shared", alice.EndReason);
         Assert.AreEqual("the user's device mapping changed", bob.EndReason);
+    }
+
+    [TestMethod]
+    public void Monitor_RevokesDetachedDevices()
+    {
+        var registry = new SessionRegistry(CreateConfiguration());
+        var map = new FakeUserDeviceMap();
+        map.Map["alice"] = Device1;
+        map.Map["bob"] = Device2;
+
+        using var alice = registry.TryClaim(Device1, "alice", IPAddress.Loopback);
+        using var bob = registry.TryClaim(Device2, "bob", IPAddress.Loopback);
+        Assert.IsNotNull(alice);
+        Assert.IsNotNull(bob);
+
+        // Not recorded yet (importing): the missing record does not count.
+        using var monitor = new SessionMonitor(registry, map, NullLogger<SessionMonitor>.Instance);
+        monitor.CheckSessions();
+        Assert.IsNull(alice.EndReason);
+        Assert.IsNull(bob.EndReason);
+
+        alice.MarkRecorded();
+        bob.MarkRecorded();
+        _ = map.Attached.Add(Device1);
+        _ = map.Attached.Add(Device2);
+        monitor.CheckSessions();
+        Assert.IsNull(alice.EndReason);
+        Assert.IsNull(bob.EndReason);
+
+        // 'usbipd detach' deletes the record.
+        _ = map.Attached.Remove(Device1);
+        monitor.CheckSessions();
+        Assert.AreEqual("an administrator detached or unbound the device", alice.EndReason);
+        Assert.IsNull(bob.EndReason);
     }
 }

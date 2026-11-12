@@ -44,6 +44,78 @@ sealed class Device
     public string Description { get; set; } = string.Empty;
 
     public DateTime CreatedUtc { get; set; }
+
+    /// <summary>
+    /// Set while the device is shared ('usbipd bind').
+    /// </summary>
+    public Bind? Bind { get; set; }
+}
+
+/// <summary>
+/// A shared device ('usbipd bind'). Unbind deletes the row; a rebind gets a new GUID.
+/// </summary>
+sealed class Bind
+{
+    /// <summary>
+    /// The bind GUID shown by 'usbipd list' (persisted GUID).
+    /// </summary>
+    public Guid Id { get; set; }
+
+    public int DeviceId { get; set; }
+
+    public Device? Device { get; set; }
+
+    public DateTime CreatedUtc { get; set; }
+
+    public string CreatedBy { get; set; } = string.Empty;
+
+    public Attachment? Attachment { get; set; }
+}
+
+/// <summary>
+/// A shared device that is attached to a client right now. Written by the service; deleting the row
+/// ('usbipd detach') makes the service detach the device.
+/// </summary>
+sealed class Attachment
+{
+    public Guid BindId { get; set; }
+
+    public Bind? Bind { get; set; }
+
+    public string BusId { get; set; } = string.Empty;
+
+    public string ClientAddress { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Instance ID of the stub (VBoxUSB) device while attached.
+    /// </summary>
+    public string StubInstanceId { get; set; } = string.Empty;
+
+    public string UserName { get; set; } = string.Empty;
+
+    public DateTime StartedUtc { get; set; }
+}
+
+/// <summary>
+/// A policy rule ('usbipd policy add') of one server.
+/// </summary>
+sealed class PolicyRuleEntry
+{
+    public Guid Id { get; set; }
+
+    public string ServerName { get; set; } = string.Empty;
+
+    public string Effect { get; set; } = string.Empty;
+
+    public string Operation { get; set; } = string.Empty;
+
+    public string? BusId { get; set; }
+
+    public string? HardwareId { get; set; }
+
+    public DateTime CreatedUtc { get; set; }
+
+    public string CreatedBy { get; set; } = string.Empty;
 }
 
 /// <summary>

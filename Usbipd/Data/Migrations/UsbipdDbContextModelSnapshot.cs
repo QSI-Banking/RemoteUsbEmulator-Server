@@ -61,6 +61,63 @@ namespace Usbipd.Data.Migrations
                     b.ToTable("AdminAudit", "usbipd");
                 });
 
+            modelBuilder.Entity("Usbipd.Data.Attachment", b =>
+                {
+                    b.Property<Guid>("BindId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BusId")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("ClientAddress")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("StartedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("StubInstanceId")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasMaxLength(63)
+                        .HasColumnType("nvarchar(63)");
+
+                    b.HasKey("BindId");
+
+                    b.ToTable("Attachments", "usbipd");
+                });
+
+            modelBuilder.Entity("Usbipd.Data.Bind", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DeviceId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId")
+                        .IsUnique();
+
+                    b.ToTable("Binds", "usbipd");
+                });
+
             modelBuilder.Entity("Usbipd.Data.Device", b =>
                 {
                     b.Property<int>("Id")
@@ -93,6 +150,49 @@ namespace Usbipd.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Devices", "usbipd");
+                });
+
+            modelBuilder.Entity("Usbipd.Data.PolicyRuleEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BusId")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Effect")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("HardwareId")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("ServerName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ServerName");
+
+                    b.ToTable("PolicyRules", "usbipd");
                 });
 
             modelBuilder.Entity("Usbipd.Data.User", b =>
@@ -147,6 +247,28 @@ namespace Usbipd.Data.Migrations
                     b.ToTable("UserDevices", "usbipd");
                 });
 
+            modelBuilder.Entity("Usbipd.Data.Attachment", b =>
+                {
+                    b.HasOne("Usbipd.Data.Bind", "Bind")
+                        .WithOne("Attachment")
+                        .HasForeignKey("Usbipd.Data.Attachment", "BindId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Bind");
+                });
+
+            modelBuilder.Entity("Usbipd.Data.Bind", b =>
+                {
+                    b.HasOne("Usbipd.Data.Device", "Device")
+                        .WithOne("Bind")
+                        .HasForeignKey("Usbipd.Data.Bind", "DeviceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Device");
+                });
+
             modelBuilder.Entity("Usbipd.Data.UserDevice", b =>
                 {
                     b.HasOne("Usbipd.Data.Device", "Device")
@@ -164,6 +286,16 @@ namespace Usbipd.Data.Migrations
                     b.Navigation("Device");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Usbipd.Data.Bind", b =>
+                {
+                    b.Navigation("Attachment");
+                });
+
+            modelBuilder.Entity("Usbipd.Data.Device", b =>
+                {
+                    b.Navigation("Bind");
                 });
 
             modelBuilder.Entity("Usbipd.Data.User", b =>

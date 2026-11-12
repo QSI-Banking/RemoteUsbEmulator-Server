@@ -182,7 +182,7 @@ sealed partial class CommandHandlers : ICommandHandlers
         }
         if (!device.PersistedGuid.HasValue)
         {
-            UsbipdRegistry.Instance.Persist(device.InstanceId, device.Description);
+            _ = Data.BindStore.Persist(device.InstanceId, device.Description);
         }
         if (!force)
         {
@@ -249,7 +249,7 @@ sealed partial class CommandHandlers : ICommandHandlers
         {
             return Task.FromResult(ExitCode.AccessDenied);
         }
-        UsbipdRegistry.Instance.StopSharingDevice(device.PersistedGuid.Value);
+        Data.BindStore.StopSharingDevice(device.PersistedGuid.Value);
         if (WindowsDevice.TryCreate(device.InstanceId, out var windowsDevice))
         {
             if (DriverTools.UnforceVBoxDriver(windowsDevice))
@@ -287,7 +287,7 @@ sealed partial class CommandHandlers : ICommandHandlers
         {
             if (device.PersistedGuid is not null)
             {
-                UsbipdRegistry.Instance.StopSharingDevice(device.PersistedGuid.Value);
+                Data.BindStore.StopSharingDevice(device.PersistedGuid.Value);
                 ReportUsersOfUnboundDevice(device.InstanceId, console);
             }
             if (WindowsDevice.TryCreate(device.InstanceId, out var windowsDevice))
@@ -325,7 +325,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             return Task.FromResult(ExitCode.Failure);
         }
 
-        var device = UsbipdRegistry.Instance.GetBoundDevices().SingleOrDefault(d => d.PersistedGuid.HasValue && d.PersistedGuid.Value == guid);
+        var device = Data.BindStore.GetBoundDevices().SingleOrDefault(d => d.PersistedGuid.HasValue && d.PersistedGuid.Value == guid);
         if (device is null)
         {
             console.ReportError($"There is no device with guid '{guid:D}'.");
@@ -359,10 +359,18 @@ sealed partial class CommandHandlers : ICommandHandlers
         {
             return Task.FromResult(ExitCode.AccessDenied);
         }
-        UsbipdRegistry.Instance.StopSharingAllDevices();
-        if (Data.UserStore.TryGetUsersOfDevice(null).Count > 0)
+        // Also run by the uninstaller (as SYSTEM): restore the drivers even if the database cannot be changed.
+        try
         {
-            console.ReportWarning("User mappings are kept; attach fails for those users until their devices are shared again. Use 'usbipd user list'.");
+            Data.BindStore.StopSharingAllDevices();
+            if (Data.UserStore.TryGetUsersOfDevice(null).Count > 0)
+            {
+                console.ReportWarning("User mappings are kept; attach fails for those users until their devices are shared again. Use 'usbipd user list'.");
+            }
+        }
+        catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))
+        {
+            console.ReportWarning($"The binds could not be removed from the database ({ex.Message}); they are kept. The drivers are restored anyway.");
         }
         var reboot = false;
         var driverError = false;
@@ -456,9 +464,17 @@ sealed partial class CommandHandlers : ICommandHandlers
                 console.ReportInfo($"Device with busid '{device.BusId}' was already not attached.");
                 continue;
             }
-            if (!UsbipdRegistry.Instance.SetDeviceAsDetached(device.PersistedGuid.Value))
+            try
             {
-                console.ReportError($"Failed to detach device with busid '{device.BusId}'.");
+                // The service detaches the device when it sees the record is gone (within a few seconds).
+                if (Data.BindStore.SetDeviceAsDetached(device.PersistedGuid.Value))
+                {
+                    console.ReportInfo($"Detach requested for device with busid '{device.BusId}'.");
+                }
+            }
+            catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))
+            {
+                console.ReportError($"Failed to detach device with busid '{device.BusId}': {ex.Message}");
                 error = true;
             }
         }
@@ -504,9 +520,14 @@ sealed partial class CommandHandlers : ICommandHandlers
             return Task.FromResult(ExitCode.Failure);
         }
 
-        if (!UsbipdRegistry.Instance.SetAllDevicesAsDetached())
+        try
         {
-            console.ReportError($"Failed to detach one or more devices.");
+            // The service detaches the devices when it sees the records are gone (within a few seconds).
+            Data.BindStore.SetAllDevicesAsDetached();
+        }
+        catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))
+        {
+            console.ReportError($"Failed to detach the devices: {ex.Message}");
             return Task.FromResult(ExitCode.Failure);
         }
         return Task.FromResult(ExitCode.Success);
@@ -544,7 +565,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             return Task.FromResult(ExitCode.Failure);
         }
 
-        if (UsbipdRegistry.Instance.GetPolicyRules().FirstOrDefault(r => r.Value == rule) is var existingRule && existingRule.Key != default)
+        if (Data.BindStore.GetPolicyRules().FirstOrDefault(r => r.Value == rule) is var existingRule && existingRule.Key != default)
         {
             console.ReportError($"Policy rule already exists with guid '{existingRule.Key:D}'.");
             return Task.FromResult(ExitCode.Failure);
@@ -555,7 +576,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             return Task.FromResult(ExitCode.AccessDenied);
         }
 
-        var guid = UsbipdRegistry.Instance.AddPolicyRule(rule);
+        var guid = Data.BindStore.AddPolicyRule(rule);
         console.ReportInfo($"Policy rule created with guid '{guid:D}'.");
         return Task.FromResult(ExitCode.Success);
     }
@@ -568,7 +589,7 @@ sealed partial class CommandHandlers : ICommandHandlers
         }
 
 #pragma warning disable CA1849 // Call async methods when in an async method
-        var policyRules = UsbipdRegistry.Instance.GetPolicyRules();
+        var policyRules = Data.BindStore.GetPolicyRules();
         console.Out.WriteLine("Policy rules:");
         console.Out.WriteLine($"{"GUID",-36}  {"EFFECT",-6}  {"OPERATION",-9}  {"BUSID",-5}  {"VID:PID",-9}");
         foreach (var rule in policyRules)
@@ -600,7 +621,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             return Task.FromResult(ExitCode.Failure);
         }
 
-        if (!UsbipdRegistry.Instance.GetPolicyRules().ContainsKey(guid))
+        if (!Data.BindStore.GetPolicyRules().ContainsKey(guid))
         {
             console.ReportError($"There is no policy rule with guid '{guid:D}'.");
             return Task.FromResult(ExitCode.Failure);
@@ -611,7 +632,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             return Task.FromResult(ExitCode.AccessDenied);
         }
 
-        UsbipdRegistry.Instance.RemovePolicyRule(guid);
+        Data.BindStore.RemovePolicyRule(guid);
         return Task.FromResult(ExitCode.Success);
     }
 
@@ -627,7 +648,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             return Task.FromResult(ExitCode.AccessDenied);
         }
 
-        UsbipdRegistry.Instance.RemovePolicyRuleAll();
+        Data.BindStore.RemovePolicyRuleAll();
         return Task.FromResult(ExitCode.Success);
     }
 }

@@ -300,7 +300,8 @@ static partial class ConsoleTools
 
     public static bool CheckWriteAccess(IConsole console)
     {
-        if (!UsbipdRegistry.Instance.HasWriteAccess)
+        using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+        if (!new System.Security.Principal.WindowsPrincipal(identity).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator))
         {
             console.ReportError("Access denied; this operation requires administrator privileges.");
             return false;

@@ -17,7 +17,7 @@ static class DeviceExtensions
     /// </summary>
     public static IEnumerable<Device> GetAll()
     {
-        var devices = new Dictionary<string, Device>(UsbipdRegistry.Instance.GetBoundDevices().Select(d => KeyValuePair.Create(d.InstanceId, d)));
+        var devices = new Dictionary<string, Device>(Data.BindStore.GetBoundDevices().Select(d => KeyValuePair.Create(d.InstanceId, d)));
         // Add all connected devices that are not hubs or stubs, and not already in the list (i.e. all USB devices that are available for USBIP sharing).
         foreach (var device in WindowsDevice.GetAll(PInvoke.GUID_DEVINTERFACE_USB_HUB).SelectMany(di => di.Children)
             .Where(d => !d.IsStub && !d.IsHub))

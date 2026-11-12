@@ -62,6 +62,22 @@ sealed class CommandHandlersCli_Tests
 
     public TestContext TestContext { get; set; }
 
+    /// <summary>
+    /// Binds and policy rules are in SQL Server; these tests need the database of appsettings.json
+    /// (or the environment variable ConnectionStrings__Usbipd).
+    /// </summary>
+    static void RequireDatabase()
+    {
+        try
+        {
+            _ = Usbipd.Data.BindStore.GetPolicyRules();
+        }
+        catch (Exception ex) when (Usbipd.Data.UserStore.IsDatabaseError(ex))
+        {
+            Assert.Inconclusive($"No usbipd database: {ex.Message}");
+        }
+    }
+
     [TestMethod]
     public async Task License()
     {
@@ -74,6 +90,7 @@ sealed class CommandHandlersCli_Tests
     [TestMethod]
     public async Task List()
     {
+        RequireDatabase();
         var cli = (ICommandHandlers)new CommandHandlers();
         var console = new TestConsole();
 
@@ -83,6 +100,7 @@ sealed class CommandHandlersCli_Tests
     [TestMethod]
     public async Task List_UsbIds()
     {
+        RequireDatabase();
         var cli = (ICommandHandlers)new CommandHandlers();
         var console = new TestConsole();
 
@@ -92,6 +110,7 @@ sealed class CommandHandlersCli_Tests
     [TestMethod]
     public async Task List_Connected()
     {
+        RequireDatabase();
         var cli = (ICommandHandlers)new CommandHandlers();
         var console = new TestConsole();
 
@@ -103,6 +122,7 @@ sealed class CommandHandlersCli_Tests
     [TestMethod]
     public async Task State()
     {
+        RequireDatabase();
         var cli = (ICommandHandlers)new CommandHandlers();
         var console = new TestConsole();
 
@@ -112,6 +132,7 @@ sealed class CommandHandlersCli_Tests
     [TestMethod]
     public async Task PolicyList()
     {
+        RequireDatabase();
         var cli = (ICommandHandlers)new CommandHandlers();
         var console = new TestConsole();
 

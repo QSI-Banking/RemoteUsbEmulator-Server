@@ -25,7 +25,7 @@ sealed partial class CommandHandlers : ICommandHandlers
         Device? device;
         if (guid.HasValue)
         {
-            device = UsbipdRegistry.Instance.GetBoundDevices().SingleOrDefault(d => d.PersistedGuid == guid.Value);
+            device = Data.BindStore.GetBoundDevices().SingleOrDefault(d => d.PersistedGuid == guid.Value);
             if (device is null)
             {
                 console.ReportError($"There is no shared device with guid '{guid.Value:D}'; run 'usbipd bind' as administrator first.");
@@ -34,7 +34,7 @@ sealed partial class CommandHandlers : ICommandHandlers
         }
         else if (busId.HasValue)
         {
-            device = UsbipdRegistry.Instance.GetBoundDevices().SingleOrDefault(d => d.BusId.HasValue && d.BusId.Value == busId.Value);
+            device = Data.BindStore.GetBoundDevices().SingleOrDefault(d => d.BusId.HasValue && d.BusId.Value == busId.Value);
             if (device is null)
             {
                 console.ReportError($"There is no shared device with busid '{busId.Value}'; run 'usbipd bind --busid {busId.Value}' as administrator first.");
@@ -96,7 +96,7 @@ sealed partial class CommandHandlers : ICommandHandlers
         }
 
         var serverName = UserStore.ServerName;
-        var boundDevices = UsbipdRegistry.Instance.GetBoundDevices().ToList();
+        var boundDevices = Data.BindStore.GetBoundDevices().ToList();
 #pragma warning disable CA1849 // Call async methods when in an async method (console output, as the other list commands)
         console.Out.WriteLine("Users:");
         console.Out.WriteLine($"{"USER",-24}  {"BUSID",-5}  {"STATE",-22}  DEVICE");
@@ -204,10 +204,11 @@ sealed partial class CommandHandlers : ICommandHandlers
     }
 
     /// <summary>
-    /// One-time move of the mappings that older versions kept in the registry (HKLM\SOFTWARE\usbipd-win\Users)
-    /// into the database. Imported entries are removed from the registry; existing database users are not changed.
+    /// One-time move of what earlier versions kept in the registry (HKLM\SOFTWARE\usbipd-win): binds, policy rules and users.
+    /// Binds keep their GUID. Imported entries are removed from the registry; entries that conflict with the database are kept
+    /// (with a warning) and the database is not changed for them.
     /// </summary>
-    async Task<ExitCode> ICommandHandlers.UserImport(IConsole console, CancellationToken cancellationToken)
+    async Task<ExitCode> ICommandHandlers.ImportRegistry(IConsole console, CancellationToken cancellationToken)
     {
         if (!CheckInstalled(console))
         {
@@ -219,18 +220,59 @@ sealed partial class CommandHandlers : ICommandHandlers
             return ExitCode.AccessDenied;
         }
 
+        var registryDevices = UsbipdRegistry.Instance.GetBoundDevices().Where(d => d.PersistedGuid.HasValue).ToList();
+        var registryRules = UsbipdRegistry.Instance.GetPolicyRules();
         var registryUsers = UsbipdRegistry.Instance.GetUserDevices();
-        if (registryUsers.Count == 0)
+        if (registryDevices.Count == 0 && registryRules.Count == 0 && registryUsers.Count == 0)
         {
-            console.ReportInfo("There are no users in the registry to import.");
+            console.ReportInfo("There is nothing in the registry to import.");
             return ExitCode.Success;
         }
 
-        var boundDevices = UsbipdRegistry.Instance.GetBoundDevices().ToList();
-        var imported = new List<string>();
+        var importedBinds = new List<Device>();
+        var importedRules = new List<Guid>();
+        var importedUsers = new List<string>();
         try
         {
             await using var db = UserStore.Open();
+            var account = UserStore.CurrentAccount;
+            foreach (var device in registryDevices)
+            {
+                var guid = device.PersistedGuid!.Value;
+                var databaseDevice = await UserStore.GetOrAddDeviceAsync(db, device.InstanceId, device.Description, cancellationToken);
+                if (databaseDevice.Id != 0 && await db.Binds.AnyAsync(b => b.DeviceId == databaseDevice.Id, cancellationToken))
+                {
+                    console.ReportWarning($"Device '{device.InstanceId}' is already shared in the database; the registry entry is kept.");
+                    continue;
+                }
+                if (await db.Binds.AnyAsync(b => b.Id == guid, cancellationToken))
+                {
+                    console.ReportWarning($"Bind guid '{guid:D}' already exists in the database; the registry entry is kept.");
+                    continue;
+                }
+                _ = db.Binds.Add(new()
+                {
+                    Id = guid,
+                    Device = databaseDevice,
+                    CreatedUtc = DateTime.UtcNow,
+                    CreatedBy = account,
+                });
+                UserStore.Audit(db, "bind import", $"{databaseDevice.InstanceId} {guid:B}");
+                importedBinds.Add(device);
+            }
+            // Saved before the users, which may refer to these devices.
+            _ = await db.SaveChangesAsync(cancellationToken);
+
+            var databaseRules = Data.BindStore.GetPolicyRules();
+            foreach (var (guid, rule) in registryRules)
+            {
+                if (!databaseRules.ContainsValue(rule))
+                {
+                    _ = Data.BindStore.AddPolicyRule(rule);
+                }
+                importedRules.Add(guid);
+            }
+
             foreach (var (userName, deviceGuid) in registryUsers)
             {
                 if (await UserStore.FindUserAsync(db, userName, cancellationToken) is not null)
@@ -238,7 +280,7 @@ sealed partial class CommandHandlers : ICommandHandlers
                     console.ReportWarning($"User '{userName}' already exists in the database; the registry entry is kept.");
                     continue;
                 }
-                var device = boundDevices.SingleOrDefault(d => d.PersistedGuid == deviceGuid);
+                var device = registryDevices.SingleOrDefault(d => d.PersistedGuid == deviceGuid);
                 if (device is null)
                 {
                     console.ReportWarning($"User '{userName}' is mapped to guid '{deviceGuid:D}', which is not shared; the registry entry is kept.");
@@ -247,17 +289,28 @@ sealed partial class CommandHandlers : ICommandHandlers
                 var databaseDevice = await UserStore.GetOrAddDeviceAsync(db, device.InstanceId, device.Description, cancellationToken);
                 _ = await UserStore.SetMappingAsync(db, userName, databaseDevice, cancellationToken);
                 UserStore.Audit(db, "user import", $"{userName} -> {databaseDevice.InstanceId}");
-                imported.Add(userName);
+                importedUsers.Add(userName);
             }
             _ = await db.SaveChangesAsync(cancellationToken);
         }
         catch (Exception ex) when (UserStore.IsDatabaseError(ex))
         {
-            console.ReportError($"User database: {ex.Message}");
+            console.ReportError($"Database: {ex.Message}");
+            console.ReportWarning("Nothing was removed from the registry; it is safe to run the import again.");
             return ExitCode.Failure;
         }
 
-        foreach (var userName in imported)
+        foreach (var device in importedBinds)
+        {
+            UsbipdRegistry.Instance.StopSharingDevice(device.PersistedGuid!.Value);
+            console.ReportInfo($"Imported bind '{device.PersistedGuid:D}' ({device.Description}).");
+        }
+        foreach (var guid in importedRules)
+        {
+            UsbipdRegistry.Instance.RemovePolicyRule(guid);
+            console.ReportInfo($"Imported policy rule '{guid:D}'.");
+        }
+        foreach (var userName in importedUsers)
         {
             _ = UsbipdRegistry.Instance.RemoveUser(userName);
             console.ReportInfo($"Imported user '{userName}'.");

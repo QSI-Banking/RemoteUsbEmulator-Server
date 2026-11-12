@@ -608,7 +608,7 @@ static class Program
                     CustomParser = ParseGuid,
                 };
                 guidOption.CompletionSources.Add(completionContext => CompletionGuard(completionContext, () =>
-                    UsbipdRegistry.Instance.GetPolicyRules().Select(r => new CompletionItem(r.Key.ToString("D")))));
+                    Data.BindStore.GetPolicyRules().Select(r => new CompletionItem(r.Key.ToString("D")))));
                 //
                 //  policy remove
                 //
@@ -699,7 +699,7 @@ static class Program
                 CustomParser = ParseGuid,
             };
             guidOption.CompletionSources.Add(completionContext => CompletionGuard(completionContext, () =>
-                UsbipdRegistry.Instance.GetBoundDevices().Where(d => !d.BusId.HasValue)
+                Data.BindStore.GetBoundDevices().Where(d => !d.BusId.HasValue)
                 .Select(d => new CompletionItem(d.PersistedGuid.GetValueOrDefault().ToString("D")))));
             //
             //  unbind [--hardware-id <VID>:<PID>]
@@ -770,7 +770,7 @@ static class Program
                     CustomParser = ParseCompatibleBusId,
                 };
                 busIdOption.CompletionSources.Add(completionContext => CompletionGuard(completionContext, () =>
-                    UsbipdRegistry.Instance.GetBoundDevices().Where(d => d.BusId.HasValue)
+                    Data.BindStore.GetBoundDevices().Where(d => d.BusId.HasValue)
                     .Select(d => new CompletionItem(d.BusId.GetValueOrDefault().ToString()))));
                 //
                 //  user add [--guid <GUID>]
@@ -783,7 +783,7 @@ static class Program
                     CustomParser = ParseGuid,
                 };
                 guidOption.CompletionSources.Add(completionContext => CompletionGuard(completionContext, () =>
-                    UsbipdRegistry.Instance.GetBoundDevices()
+                    Data.BindStore.GetBoundDevices()
                     .Select(d => new CompletionItem(d.PersistedGuid.GetValueOrDefault().ToString("D")))));
                 //
                 //  user add [--force]
@@ -868,18 +868,6 @@ static class Program
                 ));
                 userCommand.Subcommands.Add(removeCommand);
             }
-            {
-                //
-                //  user import
-                //
-                var importCommand = new Command("import", "Move registry users to the database\0" +
-                    "One-time move of the user mappings kept in the registry by earlier versions into the database. " +
-                    "Imported entries are removed from the registry; users that already exist in the database are not changed.");
-                importCommand.SetAction(async (parseResult, cancellationToken) => (int)
-                    await commandHandlers.UserImport(console, cancellationToken)
-                );
-                userCommand.Subcommands.Add(importCommand);
-            }
             rootCommand.Subcommands.Add(userCommand);
         }
         {
@@ -921,6 +909,15 @@ static class Program
             migrateCommand.SetAction(async (parseResult, cancellationToken) => (int)
                 await Data.DatabaseCommands.MigrateAsync(console, cancellationToken));
             dbCommand.Subcommands.Add(migrateCommand);
+            //
+            //  db import-registry
+            //
+            var importCommand = new Command("import-registry", "Move registry settings to the database\0" +
+                "One-time move of the binds, policy rules and users that earlier versions kept in the registry into the database. " +
+                "Imported entries are removed from the registry; entries that conflict with the database are kept.");
+            importCommand.SetAction(async (parseResult, cancellationToken) => (int)
+                await commandHandlers.ImportRegistry(console, cancellationToken));
+            dbCommand.Subcommands.Add(importCommand);
             rootCommand.Subcommands.Add(dbCommand);
         }
         {
@@ -1025,6 +1022,13 @@ static class Program
                 return ExitCode.Canceled;
             }
             return Enum.IsDefined(exitCode) ? exitCode : throw new UnexpectedResultException($"Unknown exit code {exitCode}");
+        }
+        catch (Exception ex) when (ex is Data.DatabaseConfigurationException or Microsoft.Data.SqlClient.SqlException
+            or Microsoft.EntityFrameworkCore.DbUpdateException)
+        {
+            // Binds, policy rules, attachments and users are in SQL Server.
+            console.ReportError($"Database: {ex.Message}");
+            return ExitCode.Failure;
         }
         catch (AggregateException ex) when (ex.Flatten().InnerExceptions.Any(e => e is OperationCanceledException or TaskCanceledException))
         {

@@ -17,7 +17,7 @@ static class Policy
         // Firewalling is not supported yet.
         _ = client;
 
-        var rules = UsbipdRegistry.Instance.GetPolicyRules();
+        var rules = Data.BindStore.GetPolicyRules();
         var allowed = rules.Values.Where(r => r.Effect == PolicyRuleEffect.Allow);
         var denied = rules.Values.Where(r => r.Effect == PolicyRuleEffect.Deny);
 

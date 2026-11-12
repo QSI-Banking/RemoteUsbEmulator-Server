@@ -5,7 +5,8 @@
 namespace Usbipd;
 
 /// <summary>
-/// Revokes active sessions whose user was removed or mapped to another device ('usbipd user remove', 'usbipd user add --force').
+/// Revokes active sessions whose user was removed or mapped to another device ('usbipd user remove', 'usbipd user add --force'),
+/// or whose attachment record was deleted ('usbipd detach', 'usbipd unbind').
 /// </summary>
 sealed class SessionMonitor(SessionRegistry sessionRegistry, IUserDeviceMap userDeviceMap, ILogger<SessionMonitor> logger) : BackgroundService
 {
@@ -24,7 +25,28 @@ sealed class SessionMonitor(SessionRegistry sessionRegistry, IUserDeviceMap user
 
     internal void CheckSessions()
     {
-        foreach (var session in SessionRegistry.Snapshot())
+        // Take the sessions before reading the records: a session that is recorded now has its record written already.
+        var sessions = SessionRegistry.Snapshot();
+        var recorded = sessions.Where(s => s.IsRecorded).ToList();
+        IReadOnlySet<Guid> attached;
+        try
+        {
+            attached = recorded.Count == 0 ? new HashSet<Guid>() : UserDeviceMap.GetAttachedDevices();
+        }
+        catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))
+        {
+            Logger.SessionCheckFailed(ex.Message);
+            return;
+        }
+        foreach (var session in recorded)
+        {
+            if (!attached.Contains(session.DeviceGuid))
+            {
+                session.Revoke("an administrator detached or unbound the device");
+            }
+        }
+
+        foreach (var session in sessions)
         {
             if (session.EndReason is not null)
             {

@@ -34,7 +34,7 @@ interface ICommandHandlers
     Task<ExitCode> UserList(IConsole console, CancellationToken cancellationToken);
     Task<ExitCode> UserRemove(string userName, IConsole console, CancellationToken cancellationToken);
     Task<ExitCode> UserRemoveAll(IConsole console, CancellationToken cancellationToken);
-    Task<ExitCode> UserImport(IConsole console, CancellationToken cancellationToken);
+    Task<ExitCode> ImportRegistry(IConsole console, CancellationToken cancellationToken);
 
     // Server
     Task<ExitCode> Server(string[] args, IConsole console, CancellationToken cancellationToken);

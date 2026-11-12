@@ -75,6 +75,12 @@ static partial class LogEvents
     [LoggerMessage(22, LogLevel.Warning, "Device at {busId} ({instanceId}) could not be handed back to Windows after detach: {reason}. It may need to be replugged.")]
     public static partial void DeviceRestartFailed(this ILogger logger, BusId busId, string instanceId, string reason);
 
+    [LoggerMessage(23, LogLevel.Warning, "The attachment record could not be removed from the database: {reason}")]
+    public static partial void AttachmentRecordNotCleared(this ILogger logger, string reason);
+
+    [LoggerMessage(24, LogLevel.Warning, "Attachment records of an earlier run could not be removed from the database: {reason}")]
+    public static partial void StaleAttachmentsNotCleared(this ILogger logger, string reason);
+
     [LoggerMessage(1000, LogLevel.Debug, "{text}")]
     public static partial void Debug(this ILogger logger, string text);
 

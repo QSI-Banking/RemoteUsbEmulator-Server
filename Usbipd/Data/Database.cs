@@ -33,12 +33,12 @@ static class Database
             .Build();
     }
 
-    /// <exception cref="InvalidOperationException">The connection string is not configured.</exception>
+    /// <exception cref="DatabaseConfigurationException">The connection string is not configured.</exception>
     public static string GetConnectionString(IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString(ConnectionStringName);
         return string.IsNullOrWhiteSpace(connectionString)
-            ? throw new InvalidOperationException(
+            ? throw new DatabaseConfigurationException(
                 $"ConnectionStrings:{ConnectionStringName} is required in appsettings.json next to usbipd.exe.")
             : connectionString;
     }
@@ -49,6 +49,24 @@ static class Database
             .UseSqlServer(connectionString, sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", UsbipdDbContext.Schema))
             .Options;
         return new UsbipdDbContext(options);
+    }
+}
+
+/// <summary>
+/// The database connection is not configured (ConnectionStrings:Usbipd).
+/// </summary>
+sealed class DatabaseConfigurationException : InvalidOperationException
+{
+    public DatabaseConfigurationException()
+    {
+    }
+
+    public DatabaseConfigurationException(string message) : base(message)
+    {
+    }
+
+    public DatabaseConfigurationException(string message, Exception innerException) : base(message, innerException)
+    {
     }
 }
 

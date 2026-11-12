@@ -103,7 +103,14 @@ sealed partial class Server : BackgroundService
         }
 
         // Cleanup any left-overs in case the previous instance crashed.
-        _ = UsbipdRegistry.Instance.SetAllDevicesAsDetached();
+        try
+        {
+            Data.BindStore.SetAllDevicesAsDetached();
+        }
+        catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))
+        {
+            Logger.StaleAttachmentsNotCleared(ex.Message);
+        }
 
         // Non-interactive services have this disabled by default.
         // We require it so the ConfigurationManager can change the driver.

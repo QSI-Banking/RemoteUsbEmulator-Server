@@ -17,6 +17,12 @@ sealed class UsbipdDbContext(DbContextOptions<UsbipdDbContext> options) : DbCont
     public DbSet<User> Users => Set<User>();
     public DbSet<Device> Devices => Set<Device>();
     public DbSet<UserDevice> UserDevices => Set<UserDevice>();
+
+    public DbSet<Bind> Binds => Set<Bind>();
+
+    public DbSet<Attachment> Attachments => Set<Attachment>();
+
+    public DbSet<PolicyRuleEntry> PolicyRules => Set<PolicyRuleEntry>();
     public DbSet<AdminAuditEntry> AdminAudit => Set<AdminAuditEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -54,6 +60,45 @@ sealed class UsbipdDbContext(DbContextOptions<UsbipdDbContext> options) : DbCont
             _ = entity.HasIndex(m => m.DeviceId);
             _ = entity.Property(m => m.CreatedUtc).HasColumnType("datetime2");
             _ = entity.Property(m => m.CreatedBy).HasMaxLength(256).IsRequired();
+        });
+
+        _ = modelBuilder.Entity<Bind>(entity =>
+        {
+            _ = entity.ToTable("Binds");
+            _ = entity.Property(b => b.Id).ValueGeneratedNever();
+            // One bind per device.
+            _ = entity.HasOne(b => b.Device).WithOne(d => d.Bind).HasForeignKey<Bind>(b => b.DeviceId)
+                .OnDelete(DeleteBehavior.Restrict);
+            _ = entity.Property(b => b.CreatedUtc).HasColumnType("datetime2");
+            _ = entity.Property(b => b.CreatedBy).HasMaxLength(256).IsRequired();
+        });
+
+        _ = modelBuilder.Entity<Attachment>(entity =>
+        {
+            _ = entity.ToTable("Attachments");
+            _ = entity.HasKey(a => a.BindId);
+            // Unbind ends the attachment.
+            _ = entity.HasOne(a => a.Bind).WithOne(b => b.Attachment).HasForeignKey<Attachment>(a => a.BindId)
+                .OnDelete(DeleteBehavior.Cascade);
+            _ = entity.Property(a => a.BusId).HasMaxLength(16).IsRequired();
+            _ = entity.Property(a => a.ClientAddress).HasMaxLength(64).IsRequired();
+            _ = entity.Property(a => a.StubInstanceId).HasMaxLength(400).IsRequired();
+            _ = entity.Property(a => a.UserName).HasMaxLength(UserNames.MaxLength).IsRequired();
+            _ = entity.Property(a => a.StartedUtc).HasColumnType("datetime2");
+        });
+
+        _ = modelBuilder.Entity<PolicyRuleEntry>(entity =>
+        {
+            _ = entity.ToTable("PolicyRules");
+            _ = entity.Property(p => p.Id).ValueGeneratedNever();
+            _ = entity.Property(p => p.ServerName).HasMaxLength(256).IsRequired();
+            _ = entity.Property(p => p.Effect).HasMaxLength(16).IsRequired();
+            _ = entity.Property(p => p.Operation).HasMaxLength(16).IsRequired();
+            _ = entity.Property(p => p.BusId).HasMaxLength(16);
+            _ = entity.Property(p => p.HardwareId).HasMaxLength(16);
+            _ = entity.HasIndex(p => p.ServerName);
+            _ = entity.Property(p => p.CreatedUtc).HasColumnType("datetime2");
+            _ = entity.Property(p => p.CreatedBy).HasMaxLength(256).IsRequired();
         });
 
         _ = modelBuilder.Entity<AdminAuditEntry>(entity =>

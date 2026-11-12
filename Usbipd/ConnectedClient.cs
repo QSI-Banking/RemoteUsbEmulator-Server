@@ -4,7 +4,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.Buffers.Binary;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
@@ -151,9 +150,11 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
         }
 
         Guid? guid;
+        Automation.Device? device;
         try
         {
             guid = UserDeviceMap.GetDeviceGuid(userName);
+            device = guid.HasValue ? Data.BindStore.GetBoundDevices().SingleOrDefault(d => d.PersistedGuid == guid.Value) : null;
         }
         catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))
         {
@@ -162,7 +163,6 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
             await SendOpCodeAsync(OpCode.OP_REP_AUTH, Status.ST_SERVER_UNAVAILABLE);
             return false;
         }
-        var device = guid.HasValue ? UsbipdRegistry.Instance.GetBoundDevices().SingleOrDefault(d => d.PersistedGuid == guid.Value) : null;
         if (device is null || !device.BusId.HasValue || device.BusId.Value.IsIncompatibleHub)
         {
             // Not mapped, bind removed, unplugged, or on an incompatible hub.
@@ -200,7 +200,17 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
         try
         {
             // Only the device mapped to the authenticated user may be imported (no policy auto-bind).
-            var device = UsbipdRegistry.Instance.GetBoundDevices().SingleOrDefault(d => d.BusId.HasValue && d.BusId.Value == busId);
+            Automation.Device? device;
+            try
+            {
+                device = Data.BindStore.GetBoundDevices().SingleOrDefault(d => d.BusId.HasValue && d.BusId.Value == busId);
+            }
+            catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))
+            {
+                Logger.UserDatabaseUnavailable(ClientContext.ClientAddress, ClientContext.AuthenticatedUser ?? string.Empty, ex.Message);
+                await SendOpCodeAsync(OpCode.OP_REP_IMPORT, Status.ST_SERVER_UNAVAILABLE);
+                return;
+            }
             if (ClientContext.AuthenticatedUser is null || device is null || device.PersistedGuid != ClientContext.AuthorizedGuid)
             {
                 Logger.ClientImportRefused(ClientContext.ClientAddress, ClientContext.AuthenticatedUser ?? string.Empty, busId);
@@ -291,6 +301,11 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
             Logger.ClientAttach(ClientContext.ClientAddress, busId, device.InstanceId);
             try
             {
+                // Recorded for 'usbipd list' and 'usbipd detach'; no attach without the record.
+                Data.BindStore.SetDeviceAsAttached(device.PersistedGuid.Value, device.BusId.Value, ClientContext.ClientAddress,
+                    vboxDevice.InstanceId, ClientContext.AuthenticatedUser);
+                session.MarkRecorded();
+
                 status = Status.ST_OK;
                 await SendOpCodeAsync(OpCode.OP_REP_IMPORT, Status.ST_OK);
                 exportedDevice.Serialize(Stream, false);
@@ -338,16 +353,7 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
                         .ThrowOnError(nameof(PInvoke.CM_Register_Notification));
                 }
 
-                // Detect unbind.
-                using var attachedKey = UsbipdRegistry.Instance.SetDeviceAsAttached(device.PersistedGuid.Value, device.BusId.Value, ClientContext.ClientAddress,
-                    vboxDevice.InstanceId);
-                var result = PInvoke.RegNotifyChangeKeyValue(attachedKey.Handle, false,
-                    Windows.Win32.System.Registry.REG_NOTIFY_FILTER.REG_NOTIFY_THREAD_AGNOSTIC, cancelEvent.SafeWaitHandle, true);
-                if (result != WIN32_ERROR.ERROR_SUCCESS)
-                {
-                    throw new Win32Exception((int)result, nameof(PInvoke.RegNotifyChangeKeyValue));
-                }
-
+                // Unbind and 'usbipd detach' delete the attachment record; SessionMonitor then revokes the session.
                 session.StartClock(SessionRegistry.Settings.MaxDuration);
                 await ServiceProvider.GetRequiredService<AttachedClient>().RunAsync(attachedClientTokenSource.Token);
             }
@@ -355,7 +361,15 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
             {
                 notification?.Dispose();
 
-                _ = UsbipdRegistry.Instance.SetDeviceAsDetached(device.PersistedGuid.Value);
+                try
+                {
+                    _ = Data.BindStore.SetDeviceAsDetached(device.PersistedGuid.Value);
+                }
+                catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))
+                {
+                    // Cleared at the next service start; 'usbipd list' ignores it once the service is stopped.
+                    Logger.AttachmentRecordNotCleared(ex.Message);
+                }
 
                 ClientContext.AttachedDevice.Dispose();
 
