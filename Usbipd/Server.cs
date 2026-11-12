@@ -93,6 +93,8 @@ sealed partial class Server : BackgroundService
         try
         {
             _ = SessionSettings.Read(Configuration);
+            // Users and mappings are in SQL Server; attaches fail (but the service runs) while it cannot be reached.
+            _ = Data.Database.GetConnectionString(Configuration);
         }
         catch (InvalidOperationException ex)
         {

@@ -847,7 +847,7 @@ static class Program
                     CustomParser = ParseUserName,
                 };
                 nameOption.CompletionSources.Add(completionContext => CompletionGuard(completionContext, () =>
-                    UsbipdRegistry.Instance.GetUserDevices().Keys.Select(n => new CompletionItem(n))));
+                    Data.UserStore.TryGetUserNames().Select(n => new CompletionItem(n))));
                 //
                 //  user remove
                 //
@@ -867,6 +867,18 @@ static class Program
                         : await commandHandlers.UserRemove(parseResult.GetRequiredValue(nameOption), console, cancellationToken)
                 ));
                 userCommand.Subcommands.Add(removeCommand);
+            }
+            {
+                //
+                //  user import
+                //
+                var importCommand = new Command("import", "Move registry users to the database\0" +
+                    "One-time move of the user mappings kept in the registry by earlier versions into the database. " +
+                    "Imported entries are removed from the registry; users that already exist in the database are not changed.");
+                importCommand.SetAction(async (parseResult, cancellationToken) => (int)
+                    await commandHandlers.UserImport(console, cancellationToken)
+                );
+                userCommand.Subcommands.Add(importCommand);
             }
             rootCommand.Subcommands.Add(userCommand);
         }

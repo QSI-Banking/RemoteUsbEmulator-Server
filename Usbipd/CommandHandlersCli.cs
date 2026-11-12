@@ -288,7 +288,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             if (device.PersistedGuid is not null)
             {
                 UsbipdRegistry.Instance.StopSharingDevice(device.PersistedGuid.Value);
-                ReportUsersOfUnboundDevice(device.PersistedGuid.Value, console);
+                ReportUsersOfUnboundDevice(device.InstanceId, console);
             }
             if (WindowsDevice.TryCreate(device.InstanceId, out var windowsDevice))
             {
@@ -360,7 +360,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             return Task.FromResult(ExitCode.AccessDenied);
         }
         UsbipdRegistry.Instance.StopSharingAllDevices();
-        if (UsbipdRegistry.Instance.GetUserDevices().Count > 0)
+        if (Data.UserStore.TryGetUsersOfDevice(null).Count > 0)
         {
             console.ReportWarning("User mappings are kept; attach fails for those users until their devices are shared again. Use 'usbipd user list'.");
         }

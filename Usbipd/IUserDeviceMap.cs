@@ -5,7 +5,7 @@
 namespace Usbipd;
 
 /// <summary>
-/// Maps a user to the bind GUID (HKLM\SOFTWARE\usbipd-win\Devices\{GUID}) of the one device that user may attach.
+/// Maps a user to the current bind GUID of the one device that user may attach (see <see cref="SqlUserDeviceMap"/>).
 /// </summary>
 interface IUserDeviceMap
 {

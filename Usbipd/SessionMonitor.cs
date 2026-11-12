@@ -7,10 +7,11 @@ namespace Usbipd;
 /// <summary>
 /// Revokes active sessions whose user was removed or mapped to another device ('usbipd user remove', 'usbipd user add --force').
 /// </summary>
-sealed class SessionMonitor(SessionRegistry sessionRegistry, IUserDeviceMap userDeviceMap) : BackgroundService
+sealed class SessionMonitor(SessionRegistry sessionRegistry, IUserDeviceMap userDeviceMap, ILogger<SessionMonitor> logger) : BackgroundService
 {
     readonly SessionRegistry SessionRegistry = sessionRegistry;
     readonly IUserDeviceMap UserDeviceMap = userDeviceMap;
+    readonly ILogger Logger = logger;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -29,10 +30,20 @@ sealed class SessionMonitor(SessionRegistry sessionRegistry, IUserDeviceMap user
             {
                 continue;
             }
-            var current = UserDeviceMap.GetDeviceGuid(session.UserName);
+            Guid? current;
+            try
+            {
+                current = UserDeviceMap.GetDeviceGuid(session.UserName);
+            }
+            catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))
+            {
+                // Keep running sessions while the database is unreachable; the time limit still applies.
+                Logger.SessionCheckFailed(ex.Message);
+                return;
+            }
             if (current is null)
             {
-                session.Revoke("the user was removed");
+                session.Revoke("the user was removed or the device is no longer shared");
             }
             else if (current.Value != session.DeviceGuid)
             {

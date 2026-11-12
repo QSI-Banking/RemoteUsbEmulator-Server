@@ -150,7 +150,18 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
             return false;
         }
 
-        var guid = UserDeviceMap.GetDeviceGuid(userName);
+        Guid? guid;
+        try
+        {
+            guid = UserDeviceMap.GetDeviceGuid(userName);
+        }
+        catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))
+        {
+            // No attaches while the user database is unreachable.
+            Logger.UserDatabaseUnavailable(ClientContext.ClientAddress, userName, ex.Message);
+            await SendOpCodeAsync(OpCode.OP_REP_AUTH, Status.ST_ERROR);
+            return false;
+        }
         var device = guid.HasValue ? UsbipdRegistry.Instance.GetBoundDevices().SingleOrDefault(d => d.PersistedGuid == guid.Value) : null;
         if (device is null || !device.BusId.HasValue || device.BusId.Value.IsIncompatibleHub)
         {
@@ -200,7 +211,18 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
             Debug.Assert(device.PersistedGuid.HasValue);
 
             // The mapping may have changed since OP_REQ_AUTH.
-            if (UserDeviceMap.GetDeviceGuid(ClientContext.AuthenticatedUser) != device.PersistedGuid)
+            Guid? currentGuid;
+            try
+            {
+                currentGuid = UserDeviceMap.GetDeviceGuid(ClientContext.AuthenticatedUser);
+            }
+            catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))
+            {
+                Logger.UserDatabaseUnavailable(ClientContext.ClientAddress, ClientContext.AuthenticatedUser, ex.Message);
+                await SendOpCodeAsync(OpCode.OP_REP_IMPORT, Status.ST_ERROR);
+                return;
+            }
+            if (currentGuid != device.PersistedGuid)
             {
                 Logger.ClientImportRefused(ClientContext.ClientAddress, ClientContext.AuthenticatedUser, busId);
                 await SendOpCodeAsync(OpCode.OP_REP_IMPORT, Status.ST_NODEV);

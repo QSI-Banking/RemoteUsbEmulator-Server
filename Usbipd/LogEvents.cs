@@ -66,6 +66,12 @@ static partial class LogEvents
     [LoggerMessage(19, LogLevel.Critical, "Configuration error: {text}")]
     public static partial void ConfigurationError(this ILogger logger, string text);
 
+    [LoggerMessage(20, LogLevel.Warning, "Active sessions cannot be checked against the user database: {reason}")]
+    public static partial void SessionCheckFailed(this ILogger logger, string reason);
+
+    [LoggerMessage(21, LogLevel.Warning, "Client {clientAddress} (user '{userName}'): the user database cannot be reached: {reason}")]
+    public static partial void UserDatabaseUnavailable(this ILogger logger, IPAddress clientAddress, string userName, string reason);
+
     [LoggerMessage(1000, LogLevel.Debug, "{text}")]
     public static partial void Debug(this ILogger logger, string text);
 

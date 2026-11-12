@@ -59,7 +59,7 @@ sealed partial class CommandHandlers : ICommandHandlers
                 .AddHostedService<Server>()
                 .AddSingleton<PcapNg>()
                 .AddSingleton<IUserAuthenticator, HardcodedUserAuthenticator>()
-                .AddSingleton<IUserDeviceMap, RegistryUserDeviceMap>()
+                .AddSingleton<IUserDeviceMap, SqlUserDeviceMap>()
                 .AddSingleton<SessionRegistry>()
                 .AddHostedService<SessionMonitor>()
                 .AddScoped<ClientContext>()

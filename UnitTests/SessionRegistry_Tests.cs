@@ -4,6 +4,7 @@
 
 using System.Net;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace UnitTests;
 
@@ -156,7 +157,7 @@ sealed class SessionRegistry_Tests
         Assert.IsNotNull(alice);
         Assert.IsNotNull(bob);
 
-        using var monitor = new SessionMonitor(registry, map);
+        using var monitor = new SessionMonitor(registry, map, NullLogger<SessionMonitor>.Instance);
         monitor.CheckSessions();
         Assert.IsNull(alice.EndReason);
         Assert.IsNull(bob.EndReason);
@@ -165,7 +166,7 @@ sealed class SessionRegistry_Tests
         map.Map["bob"] = Device1;
         monitor.CheckSessions();
 
-        Assert.AreEqual("the user was removed", alice.EndReason);
+        Assert.AreEqual("the user was removed or the device is no longer shared", alice.EndReason);
         Assert.AreEqual("the user's device mapping changed", bob.EndReason);
     }
 }
