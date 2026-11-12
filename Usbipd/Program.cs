@@ -926,7 +926,7 @@ static class Program
             AddInstallerSubcommand("enable_forced", commandHandlers.InstallerEnableForced);
             {
                 //
-                //  installer configure_tls [--port <PORT>] [--server-certificate <THUMBPRINT>] [--client-ca <THUMBPRINTS>]
+                //  installer configure_tls [--port <PORT>] [--server-certificate <THUMBPRINT>] [--client-ca <THUMBPRINTS>] [--session-max-minutes <MINUTES>]
                 //
                 var portOption = new Option<string>("--port")
                 {
@@ -940,14 +940,20 @@ static class Program
                 {
                     Description = "Thumbprints of the CAs that issue client certificates",
                 };
+                var sessionMaxMinutesOption = new Option<string>("--session-max-minutes")
+                {
+                    Description = "Minutes after which an attached device is detached",
+                };
                 var configureTlsCommand = new Command("configure_tls")
                 {
                     portOption,
                     serverCertificateOption,
                     clientCaOption,
+                    sessionMaxMinutesOption,
                 };
                 configureTlsCommand.SetAction(parseResult => (int)InstallerTlsConfiguration.Configure(console,
-                    parseResult.GetValue(portOption), parseResult.GetValue(serverCertificateOption), parseResult.GetValue(clientCaOption)));
+                    parseResult.GetValue(portOption), parseResult.GetValue(serverCertificateOption), parseResult.GetValue(clientCaOption),
+                    parseResult.GetValue(sessionMaxMinutesOption)));
                 installCommand.Subcommands.Add(configureTlsCommand);
             }
 

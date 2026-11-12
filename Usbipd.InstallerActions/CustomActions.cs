@@ -20,12 +20,14 @@ public static class CustomActions
     const string PortProperty = "TLS_PORT";
     const string ServerCertificateProperty = "TLS_SERVER_CERT";
     const string ClientCaProperty = "TLS_CLIENT_CA";
+    const string SessionMaxMinutesProperty = "SESSION_MAX_MINUTES";
+    const string DefaultSessionMaxMinutes = "10";
     const string DefaultPort = "3241";
 
     const string ServerAuthenticationOid = "1.3.6.1.5.5.7.3.1";
 
     /// <summary>
-    /// Presets TLS_PORT, TLS_SERVER_CERT and TLS_CLIENT_CA from an existing appsettings.json,
+    /// Presets TLS_PORT, TLS_SERVER_CERT, TLS_CLIENT_CA and SESSION_MAX_MINUTES from an existing appsettings.json,
     /// unless they were passed on the command line. Runs in both the UI and the execute sequence,
     /// so a silent upgrade keeps the current settings and the firewall rule keeps the current port.
     /// </summary>
@@ -35,6 +37,7 @@ public static class CustomActions
         string port = null;
         string server = null;
         string ca = null;
+        string sessionMinutes = null;
         try
         {
             var folder = session["APPLICATIONFOLDER"];
@@ -46,6 +49,7 @@ public static class CustomActions
                 port = Text(Child(tls, "Port"));
                 server = Text(Child(tls, "ServerCertificateThumbprint"));
                 ca = Text(Child(tls, "ClientCaThumbprints"));
+                sessionMinutes = Text(Child(Child(Child(root, "usbipd"), "Session"), "MaxDurationMinutes"));
                 session.Log($"ReadTlsSettings: read {path}");
             }
         }
@@ -57,6 +61,7 @@ public static class CustomActions
         SetIfEmpty(session, PortProperty, string.IsNullOrWhiteSpace(port) ? DefaultPort : port);
         SetIfEmpty(session, ServerCertificateProperty, server);
         SetIfEmpty(session, ClientCaProperty, ca);
+        SetIfEmpty(session, SessionMaxMinutesProperty, string.IsNullOrWhiteSpace(sessionMinutes) ? DefaultSessionMaxMinutes : sessionMinutes);
         return ActionResult.Success;
     }
 

@@ -190,7 +190,7 @@ SPDX-License-Identifier: GPL-3.0-only
 
         <!--
         TLS settings, chosen in the TLS dialog or passed on the command line (silent install):
-            msiexec /i usbipd-win.msi /qn TLS_PORT=3241 TLS_SERVER_CERT=<thumbprint> TLS_CLIENT_CA=<thumbprint>[,<thumbprint>...]
+            msiexec /i usbipd-win.msi /qn TLS_PORT=3241 TLS_SERVER_CERT=<thumbprint> TLS_CLIENT_CA=<thumbprint>[,<thumbprint>...] SESSION_MAX_MINUTES=10
         Values that are not passed are read from the existing appsettings.json (ReadTlsSettings), so a silent upgrade keeps them.
         usbipd.exe writes and validates appsettings.json itself; an invalid choice fails (and rolls back) the installation.
         -->
@@ -199,12 +199,14 @@ SPDX-License-Identifier: GPL-3.0-only
         <EnsureTable Id="ComboBox" />
         <Property Id="TLS_SERVER_CERT" Secure="yes" />
         <Property Id="TLS_CLIENT_CA" Secure="yes" />
+        <!-- minutes after which an attached device is detached (usbipd:Session:MaxDurationMinutes, 1-1440, default 10) -->
+        <Property Id="SESSION_MAX_MINUTES" Secure="yes" />
 
         <Binary Id="UsbipdTlsCA" SourceFile="$(var.Usbipd.InstallerActions.TargetDir)Usbipd.InstallerActions.CA.dll" />
         <CustomAction Id="ReadTlsSettings" BinaryRef="UsbipdTlsCA" DllEntry="ReadTlsSettings" Execute="immediate" Return="check" />
         <CustomAction Id="ListCertificates" BinaryRef="UsbipdTlsCA" DllEntry="ListCertificates" Execute="immediate" Return="ignore" />
 
-        <SetProperty Id="ConfigureTls" Value="&quot;[#usbipd.exe]&quot; installer configure_tls --port &quot;[TLS_PORT]&quot; --server-certificate &quot;[TLS_SERVER_CERT]&quot; --client-ca &quot;[TLS_CLIENT_CA]&quot;" Sequence="execute" Before="ConfigureTls" Condition="$(var.InstallOrUpdateOrRepair)" />
+        <SetProperty Id="ConfigureTls" Value="&quot;[#usbipd.exe]&quot; installer configure_tls --port &quot;[TLS_PORT]&quot; --server-certificate &quot;[TLS_SERVER_CERT]&quot; --client-ca &quot;[TLS_CLIENT_CA]&quot; --session-max-minutes &quot;[SESSION_MAX_MINUTES]&quot;" Sequence="execute" Before="ConfigureTls" Condition="$(var.InstallOrUpdateOrRepair)" />
         <CustomAction Id="ConfigureTls" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixQuietExec" Return="check" Impersonate="no" Execute="deferred" />
 
         <InstallUISequence>

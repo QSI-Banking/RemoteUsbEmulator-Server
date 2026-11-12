@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Usbipd;
 
 /// <summary>
-/// 'usbipd installer configure_tls': the MSI runs this (deferred, as SYSTEM) to write the TLS settings chosen
+/// 'usbipd installer configure_tls': the MSI runs this (deferred, as SYSTEM) to write the TLS and session settings chosen
 /// in the installer into appsettings.json next to usbipd.exe. Settings that are not passed are kept, and the
 /// result is validated exactly as the service validates it at start, so a bad choice fails the installation.
 /// </summary>
@@ -20,7 +20,8 @@ static class InstallerTlsConfiguration
 {
     static string SettingsPath => Path.Combine(AppContext.BaseDirectory, "appsettings.json");
 
-    public static ExitCode Configure(IConsole console, string? port, string? serverCertificate, string? clientCertificateAuthorities)
+    public static ExitCode Configure(IConsole console, string? port, string? serverCertificate, string? clientCertificateAuthorities,
+        string? sessionMaxMinutes)
     {
         try
         {
@@ -52,6 +53,16 @@ static class InstallerTlsConfiguration
                 tls["ClientCaThumbprints"] = thumbprints;
             }
 
+            if (!string.IsNullOrWhiteSpace(sessionMaxMinutes))
+            {
+                if (!int.TryParse(sessionMaxMinutes.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var minutes)
+                    || minutes < 1 || minutes > 1440)
+                {
+                    throw new InvalidOperationException($"Session limit '{sessionMaxMinutes}' must be a number of minutes from 1 to 1440.");
+                }
+                GetObject(GetObject(root, "usbipd"), "Session")["MaxDurationMinutes"] = minutes;
+            }
+
             var json = Serialize(root);
             Validate(json);
 
@@ -74,6 +85,7 @@ static class InstallerTlsConfiguration
     {
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
         var configuration = new ConfigurationBuilder().AddJsonStream(stream).Build();
+        _ = SessionSettings.Read(configuration);
         var settings = TlsSettings.Read(configuration);
         using var authenticator = new TlsServerAuthenticator(settings, NullLogger.Instance);
     }

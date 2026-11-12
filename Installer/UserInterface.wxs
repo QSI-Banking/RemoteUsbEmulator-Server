@@ -327,7 +327,7 @@ SPDX-License-Identifier: GPL-3.0-only
             Mutual TLS settings. The drop-downs are filled by the ListCertificates custom action;
             the initial values come from appsettings.json (ReadTlsSettings) or the command line.
             -->
-            <?define TlsComplete="TLS_PORT AND TLS_SERVER_CERT AND TLS_CLIENT_CA" ?>
+            <?define TlsComplete="TLS_PORT AND TLS_SERVER_CERT AND TLS_CLIENT_CA AND SESSION_MAX_MINUTES" ?>
 
             <Dialog Id="Tls" Width="$(var.WizardW)" Height="$(var.WizardH)" Title="$(var.WizardTitle)">
                 <!-- dialog -->
@@ -362,7 +362,7 @@ SPDX-License-Identifier: GPL-3.0-only
                 <!-- content -->
                 <Control
                     Id="Title" Type="Text" X="$(var.TitleX)" Y="$(var.TitleY)" Width="$(var.TitleW)" Height="$(var.TitleH)" TabSkip="yes"
-                    Text="{\Title}Mutual TLS" NoPrefix="yes"
+                    Text="{\Title}Connection settings" NoPrefix="yes"
                     />
                 <Control
                     Id="Content" Type="Text" X="$(var.ContentX)" Y="72" Width="$(var.ContentW)" Height="26" TabSkip="yes" NoPrefix="yes"
@@ -371,6 +371,8 @@ SPDX-License-Identifier: GPL-3.0-only
 
                 <Control Id="PortLabel" Type="Text" X="30" Y="104" Width="100" Height="13" TabSkip="yes" Text="{\Caption}&amp;TLS port:" />
                 <Control Id="Port" Type="Edit" X="140" Y="102" Width="50" Height="15" Property="TLS_PORT" Integer="yes" />
+                <Control Id="SessionLabel" Type="Text" X="200" Y="104" Width="95" Height="13" TabSkip="yes" Text="{\Caption}Session &amp;limit (minutes):" />
+                <Control Id="SessionMinutes" Type="Edit" X="295" Y="102" Width="45" Height="15" Property="SESSION_MAX_MINUTES" Integer="yes" />
 
                 <Control Id="ServerCertLabel" Type="Text" X="30" Y="124" Width="310" Height="13" TabSkip="yes"
                     Text="{\Caption}&amp;Server certificate (Local Computer, Personal store, with private key):" />
@@ -382,13 +384,13 @@ SPDX-License-Identifier: GPL-3.0-only
 
                 <Control
                     Id="Hint" Type="Text" X="30" Y="196" Width="310" Height="34" TabSkip="yes" NoPrefix="yes"
-                    Text="{\Caption}Import the certificates into the Local Computer stores first. Silent install: TLS_PORT, TLS_SERVER_CERT and TLS_CLIENT_CA (thumbprints)."
+                    Text="{\Caption}Import the certificates into the Local Computer stores first. Silent install: TLS_PORT, TLS_SERVER_CERT and TLS_CLIENT_CA (thumbprints), SESSION_MAX_MINUTES (1-1440)."
                     />
             </Dialog>
 
             <Dialog Id="TlsIncomplete" Width="260" Height="85" Title="$(var.WizardTitle)" NoMinimize="yes">
                 <Control Id="Text" Type="Text" X="15" Y="15" Width="230" Height="40" TabSkip="no" NoPrefix="yes"
-                    Text="{\Body}Enter the TLS port and choose both the server certificate and the client certificate CA." />
+                    Text="{\Body}Enter the TLS port and the session limit, and choose both the server certificate and the client certificate CA." />
                 <Control Id="OK" Type="PushButton" X="180" Y="58" Width="66" Height="20" Default="yes" Cancel="yes" Text="{\Caption}&amp;OK">
                     <Publish Event="EndDialog" Value="Return" />
                 </Control>
