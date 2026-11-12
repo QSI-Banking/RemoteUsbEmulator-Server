@@ -455,8 +455,14 @@ sealed partial class CommandHandlers : ICommandHandlers
             return ExitCode.Failure;
         }
 
+        var deviceList = devices.ToList();
+        if (deviceList.Any(d => d.PersistedGuid.HasValue && d.ClientIPAddress is not null) && !CheckWriteAccess(console))
+        {
+            return ExitCode.AccessDenied;
+        }
+
         var error = false;
-        foreach (var device in devices)
+        foreach (var device in deviceList)
         {
             if (!device.PersistedGuid.HasValue || device.ClientIPAddress is null)
             {
@@ -518,6 +524,11 @@ sealed partial class CommandHandlers : ICommandHandlers
         if (!CheckInstalled(console))
         {
             return Task.FromResult(ExitCode.Failure);
+        }
+
+        if (!CheckWriteAccess(console))
+        {
+            return Task.FromResult(ExitCode.AccessDenied);
         }
 
         try

@@ -40,6 +40,7 @@ interface ICommandHandlers
     Task<ExitCode> ClientEnable(string thumbprint, IConsole console, CancellationToken cancellationToken);
     Task<ExitCode> ClientDisable(string thumbprint, IConsole console, CancellationToken cancellationToken);
     Task<ExitCode> ClientRemove(string thumbprint, IConsole console, CancellationToken cancellationToken);
+    Task<ExitCode> Admin(IConsole console, CancellationToken cancellationToken);
 
     // Server
     Task<ExitCode> Server(string[] args, IConsole console, CancellationToken cancellationToken);

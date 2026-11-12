@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0-only
 
-using System.Security.Principal;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,14 +20,7 @@ static class UserStore
     /// <summary>
     /// The Windows account recorded as the author of a change.
     /// </summary>
-    public static string CurrentAccount
-    {
-        get
-        {
-            using var identity = WindowsIdentity.GetCurrent();
-            return identity.Name;
-        }
-    }
+    public static string CurrentAccount => AdminAuthorization.AccountName;
 
     /// <summary>
     /// A database connection for the CLI: the connection string from appsettings.json, as the current user.

@@ -28,6 +28,11 @@ static class DatabaseCommands
 
     public static async Task<ExitCode> MigrateAsync(IConsole console, CancellationToken cancellationToken)
     {
+        // Connects as the administrator who signs in, who needs permission to change the schema.
+        if (!AdminAuthorization.Authorize(console))
+        {
+            return ExitCode.AccessDenied;
+        }
         try
         {
             var connectionString = Database.GetConnectionString(Database.LoadConfiguration());

@@ -16,7 +16,7 @@ sealed partial class CommandHandlers : ICommandHandlers
         {
             return ExitCode.Failure;
         }
-        if (!CheckWriteAccess(console))
+        if (!CheckElevated(console))
         {
             return ExitCode.AccessDenied;
         }

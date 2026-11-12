@@ -1007,6 +1007,20 @@ static class Program
         }
         {
             //
+            //  admin
+            //
+            var adminCommand = new Command("admin", "Run several commands after one sign-in\0" + $"""
+                Every change asks for the credentials of a local administrator. An admin session asks once, \
+                then runs the commands you type until 'exit'. It locks after \
+                {(int)AdminAuthorization.SessionIdleTimeout.TotalMinutes} minutes without a command.
+                """.Unwrap());
+            adminCommand.SetAction(async (parseResult, cancellationToken) => (int)
+                await commandHandlers.Admin(console, cancellationToken)
+            );
+            rootCommand.Subcommands.Add(adminCommand);
+        }
+        {
+            //
             //  wsl
             //
             //  NOTE: This command is obsolete; we just need to inform the user where to find the changes.

@@ -298,7 +298,19 @@ static partial class ConsoleTools
         return true;
     }
 
+    /// <summary>
+    /// For every change: the process must be elevated (driver changes), and an administrator must sign in
+    /// (see <see cref="AdminAuthorization"/>), also in an elevated window.
+    /// </summary>
     public static bool CheckWriteAccess(IConsole console)
+    {
+        return CheckElevated(console) && AdminAuthorization.Authorize(console);
+    }
+
+    /// <summary>
+    /// The process must run elevated; no sign-in (for example 'usbipd server' in a console).
+    /// </summary>
+    public static bool CheckElevated(IConsole console)
     {
         using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
         if (!new System.Security.Principal.WindowsPrincipal(identity).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator))

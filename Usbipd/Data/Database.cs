@@ -2,8 +2,11 @@
 //
 // SPDX-License-Identifier: GPL-3.0-only
 
+using System.Data.Common;
+using System.Security.Principal;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Usbipd.Data;
 
@@ -47,8 +50,36 @@ static class Database
     {
         var options = new DbContextOptionsBuilder<UsbipdDbContext>()
             .UseSqlServer(connectionString, sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", UsbipdDbContext.Schema))
+            .AddInterceptors(ImpersonatingConnectionInterceptor.Instance)
             .Options;
         return new UsbipdDbContext(options);
+    }
+}
+
+/// <summary>
+/// Opens CLI connections as the administrator checked by <see cref="AdminAuthorization"/> (Windows authentication),
+/// so that the database permissions and the audit apply to that person. Without a checked administrator
+/// (the service, read-only commands), connections are made as the process account.
+/// </summary>
+sealed class ImpersonatingConnectionInterceptor : DbConnectionInterceptor
+{
+    public static readonly ImpersonatingConnectionInterceptor Instance = new();
+
+    public override InterceptionResult ConnectionOpening(DbConnection connection, ConnectionEventData eventData, InterceptionResult result)
+    {
+        if (AdminAuthorization.Identity is not { } identity)
+        {
+            return result;
+        }
+        WindowsIdentity.RunImpersonated(identity.AccessToken, connection.Open);
+        return InterceptionResult.Suppress();
+    }
+
+    public override ValueTask<InterceptionResult> ConnectionOpeningAsync(DbConnection connection, ConnectionEventData eventData,
+        InterceptionResult result, CancellationToken cancellationToken = default)
+    {
+        // Opened synchronously: impersonation is per thread.
+        return ValueTask.FromResult(ConnectionOpening(connection, eventData, result));
     }
 }
 
