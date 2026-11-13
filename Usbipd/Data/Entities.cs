@@ -24,6 +24,33 @@ sealed class User
     public string CreatedBy { get; set; } = string.Empty;
 
     public UserDevice? UserDevice { get; set; }
+
+    public OtpSecret? OtpSecret { get; set; }
+}
+
+/// <summary>
+/// The TOTP secret of a user (RFC 6238: HMAC-SHA1, 6 digits, 30 seconds).
+/// <para>
+/// Stored in plain text for now; encryption with key rotation is planned (step 8e). Protect read access to this table.
+/// </para>
+/// </summary>
+sealed class OtpSecret
+{
+    public int UserId { get; set; }
+
+    public User? User { get; set; }
+
+    public byte[] Secret { get; set; } = [];
+
+    /// <summary>
+    /// The time step of the last accepted code; a code is accepted only for a later step, so it cannot be used twice.
+    /// The only column the service writes.
+    /// </summary>
+    public long LastAcceptedStep { get; set; }
+
+    public DateTime CreatedUtc { get; set; }
+
+    public string CreatedBy { get; set; } = string.Empty;
 }
 
 /// <summary>

@@ -25,6 +25,8 @@ sealed class UsbipdDbContext(DbContextOptions<UsbipdDbContext> options) : DbCont
     public DbSet<PolicyRuleEntry> PolicyRules => Set<PolicyRuleEntry>();
 
     public DbSet<ClientCertificate> ClientCertificates => Set<ClientCertificate>();
+
+    public DbSet<OtpSecret> OtpSecrets => Set<OtpSecret>();
     public DbSet<AdminAuditEntry> AdminAudit => Set<AdminAuditEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -101,6 +103,17 @@ sealed class UsbipdDbContext(DbContextOptions<UsbipdDbContext> options) : DbCont
             _ = entity.HasIndex(p => p.ServerName);
             _ = entity.Property(p => p.CreatedUtc).HasColumnType("datetime2");
             _ = entity.Property(p => p.CreatedBy).HasMaxLength(256).IsRequired();
+        });
+
+        _ = modelBuilder.Entity<OtpSecret>(entity =>
+        {
+            _ = entity.ToTable("OtpSecrets");
+            _ = entity.HasKey(o => o.UserId);
+            _ = entity.HasOne(o => o.User).WithOne(u => u.OtpSecret).HasForeignKey<OtpSecret>(o => o.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            _ = entity.Property(o => o.Secret).HasMaxLength(64).IsRequired();
+            _ = entity.Property(o => o.CreatedUtc).HasColumnType("datetime2");
+            _ = entity.Property(o => o.CreatedBy).HasMaxLength(256).IsRequired();
         });
 
         _ = modelBuilder.Entity<ClientCertificate>(entity =>

@@ -39,21 +39,21 @@ static class UserStore
         return ex is InvalidOperationException or SqlException or DbUpdateException;
     }
 
-    internal sealed record UserMapping(string UserName, string? ServerName, string? InstanceId, string? Description);
+    internal sealed record UserMapping(string UserName, string? ServerName, string? InstanceId, string? Description, bool HasOtpSecret);
 
     public static async Task<List<UserMapping>> ListAsync(UsbipdDbContext db, CancellationToken cancellationToken)
     {
         return await db.Users.AsNoTracking()
             .OrderBy(u => u.Name)
             .Select(u => new UserMapping(u.Name, u.UserDevice!.Device!.ServerName, u.UserDevice.Device.InstanceId,
-                u.UserDevice.Device.Description))
+                u.UserDevice.Device.Description, u.OtpSecret != null))
             .ToListAsync(cancellationToken);
     }
 
     public static async Task<User?> FindUserAsync(UsbipdDbContext db, string userName, CancellationToken cancellationToken)
     {
         // The column collation is case-insensitive, like UserNames.Comparer.
-        return await db.Users.Include(u => u.UserDevice!).ThenInclude(m => m.Device)
+        return await db.Users.Include(u => u.UserDevice!).ThenInclude(m => m.Device).Include(u => u.OtpSecret)
             .SingleOrDefaultAsync(u => u.Name == userName, cancellationToken);
     }
 
@@ -119,6 +119,36 @@ static class UserStore
             user.UserDevice.CreatedBy = account;
         }
         return user;
+    }
+
+    /// <summary>
+    /// Gives the user a new TOTP secret, replacing any existing one (codes from the old secret stop working).
+    /// </summary>
+    /// <returns>The secret, to show to the administrator once.</returns>
+    public static byte[] SetNewOtpSecret(User user)
+    {
+        var secret = Totp.CreateSecret();
+        var now = DateTime.UtcNow;
+        var account = CurrentAccount;
+        if (user.OtpSecret is null)
+        {
+            user.OtpSecret = new()
+            {
+                User = user,
+                Secret = secret,
+                LastAcceptedStep = 0,
+                CreatedUtc = now,
+                CreatedBy = account,
+            };
+        }
+        else
+        {
+            user.OtpSecret.Secret = secret;
+            user.OtpSecret.LastAcceptedStep = 0;
+            user.OtpSecret.CreatedUtc = now;
+            user.OtpSecret.CreatedBy = account;
+        }
+        return secret;
     }
 
     public static void Audit(UsbipdDbContext db, string action, string target)

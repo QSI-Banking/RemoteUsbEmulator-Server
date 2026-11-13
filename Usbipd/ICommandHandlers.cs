@@ -34,6 +34,7 @@ interface ICommandHandlers
     Task<ExitCode> UserList(IConsole console, CancellationToken cancellationToken);
     Task<ExitCode> UserRemove(string userName, IConsole console, CancellationToken cancellationToken);
     Task<ExitCode> UserRemoveAll(IConsole console, CancellationToken cancellationToken);
+    Task<ExitCode> UserOtpReset(string userName, IConsole console, CancellationToken cancellationToken);
     Task<ExitCode> ImportRegistry(IConsole console, CancellationToken cancellationToken);
     Task<ExitCode> ClientAdd(string? thumbprint, string? certificateFile, string name, IConsole console, CancellationToken cancellationToken);
     Task<ExitCode> ClientList(IConsole console, CancellationToken cancellationToken);

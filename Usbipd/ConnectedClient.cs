@@ -142,7 +142,21 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
         var otp = await ReceiveLengthPrefixedStringAsync(USBIP_MAX_OTP, cancellationToken);
 
         // Never log the one-time password; log the user name only if it is well-formed.
-        if (userName is null || otp is null || !UserNames.IsValid(userName) || !UserAuthenticator.Authenticate(userName, otp))
+        var authenticated = false;
+        if (userName is not null && otp is not null && UserNames.IsValid(userName))
+        {
+            try
+            {
+                authenticated = UserAuthenticator.Authenticate(userName, otp);
+            }
+            catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))
+            {
+                Logger.UserDatabaseUnavailable(ClientContext.ClientAddress, userName, ex.Message);
+                await SendOpCodeAsync(OpCode.OP_REP_AUTH, Status.ST_SERVER_UNAVAILABLE);
+                return false;
+            }
+        }
+        if (!authenticated || userName is null)
         {
             Logger.ClientAuthenticationFailed(ClientContext.ClientAddress, UserNames.IsValid(userName) ? userName : "<invalid>");
             await SendOpCodeAsync(OpCode.OP_REP_AUTH, Status.ST_AUTH_FAILED);

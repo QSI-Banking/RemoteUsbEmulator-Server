@@ -882,6 +882,33 @@ static class Program
                 ));
                 userCommand.Subcommands.Add(removeCommand);
             }
+            {
+                //
+                //  user otp reset --name <NAME>
+                //
+                var nameOption = new Option<string>("--name", "-n")
+                {
+                    Description = "Give the user having <NAME> a new secret",
+                    HelpName = "NAME",
+                    Required = true,
+                    CustomParser = ParseUserName,
+                };
+                nameOption.CompletionSources.Add(completionContext => CompletionGuard(completionContext, () =>
+                    Data.UserStore.TryGetUserNames().Select(n => new CompletionItem(n))));
+                var resetCommand = new Command("reset", "Give a user a new one-time password secret\0" +
+                    "Creates a new secret for the user's authenticator app and shows it once. " +
+                    "Codes from the old secret stop working immediately.")
+                {
+                    nameOption,
+                };
+                resetCommand.SetAction(async (parseResult, cancellationToken) => (int)
+                    await commandHandlers.UserOtpReset(parseResult.GetRequiredValue(nameOption), console, cancellationToken)
+                );
+                var otpCommand = new Command("otp", "Manage one-time password secrets\0" +
+                    "A user signs in with a code from an authenticator app (TOTP). 'usbipd user add' creates the secret of a new user.");
+                otpCommand.Subcommands.Add(resetCommand);
+                userCommand.Subcommands.Add(otpCommand);
+            }
             rootCommand.Subcommands.Add(userCommand);
         }
         {

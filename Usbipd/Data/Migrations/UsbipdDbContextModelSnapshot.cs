@@ -198,6 +198,32 @@ namespace Usbipd.Data.Migrations
                     b.ToTable("Devices", "usbipd");
                 });
 
+            modelBuilder.Entity("Usbipd.Data.OtpSecret", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long>("LastAcceptedStep")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte[]>("Secret")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varbinary(64)");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("OtpSecrets", "usbipd");
+                });
+
             modelBuilder.Entity("Usbipd.Data.PolicyRuleEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -315,6 +341,17 @@ namespace Usbipd.Data.Migrations
                     b.Navigation("Device");
                 });
 
+            modelBuilder.Entity("Usbipd.Data.OtpSecret", b =>
+                {
+                    b.HasOne("Usbipd.Data.User", "User")
+                        .WithOne("OtpSecret")
+                        .HasForeignKey("Usbipd.Data.OtpSecret", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Usbipd.Data.UserDevice", b =>
                 {
                     b.HasOne("Usbipd.Data.Device", "Device")
@@ -346,6 +383,8 @@ namespace Usbipd.Data.Migrations
 
             modelBuilder.Entity("Usbipd.Data.User", b =>
                 {
+                    b.Navigation("OtpSecret");
+
                     b.Navigation("UserDevice");
                 });
 #pragma warning restore 612, 618

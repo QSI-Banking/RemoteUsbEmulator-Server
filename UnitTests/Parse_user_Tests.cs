@@ -130,4 +130,32 @@ sealed class Parse_user_Tests
     {
         Test(ExitCode.ParseError, "user", "remove", "--all", "--name", TestUser);
     }
+
+    [TestMethod]
+    public void OtpReset_Success()
+    {
+        var mock = CreateMock();
+        mock.Setup(m => m.UserOtpReset(TestUser, It.IsNotNull<IConsole>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.FromResult(ExitCode.Success));
+
+        Test(ExitCode.Success, mock, "user", "otp", "reset", "--name", TestUser);
+    }
+
+    [TestMethod]
+    public void OtpReset_NameMissing()
+    {
+        Test(ExitCode.ParseError, "user", "otp", "reset");
+    }
+
+    [TestMethod]
+    public void OtpReset_NameInvalid()
+    {
+        Test(ExitCode.ParseError, "user", "otp", "reset", "--name", "has space");
+    }
+
+    [TestMethod]
+    public void Otp_CommandMissing()
+    {
+        Test(ExitCode.ParseError, "user", "otp");
+    }
 }

@@ -64,9 +64,20 @@ sealed partial class CommandHandlers : ICommandHandlers
             var databaseDevice = await UserStore.GetOrAddDeviceAsync(db, device.InstanceId, device.Description, cancellationToken);
             var user = await UserStore.SetMappingAsync(db, userName, databaseDevice, cancellationToken);
             UserStore.Audit(db, existing is null ? "user add" : "user remap", $"{user.Name} -> {databaseDevice.InstanceId}");
+            // A new user (or one without a secret yet) gets a TOTP secret; an existing secret is kept.
+            byte[]? secret = null;
+            if (user.OtpSecret is null)
+            {
+                secret = UserStore.SetNewOtpSecret(user);
+                UserStore.Audit(db, "user otp reset", user.Name);
+            }
             _ = await db.SaveChangesAsync(cancellationToken);
 
             console.ReportInfo($"User '{user.Name}' mapped to '{device.Description}' ({device.InstanceId}).");
+            if (secret is not null)
+            {
+                ReportOtpSecret(user.Name, secret, console);
+            }
             return ExitCode.Success;
         }
         catch (Exception ex) when (UserStore.IsDatabaseError(ex))
@@ -74,6 +85,65 @@ sealed partial class CommandHandlers : ICommandHandlers
             console.ReportError($"User database: {ex.Message}");
             return ExitCode.Failure;
         }
+    }
+
+    /// <summary>
+    /// 'usbipd user otp reset': a new TOTP secret for an existing user; codes from the old secret stop working.
+    /// </summary>
+    async Task<ExitCode> ICommandHandlers.UserOtpReset(string userName, IConsole console, CancellationToken cancellationToken)
+    {
+        if (!CheckInstalled(console))
+        {
+            return ExitCode.Failure;
+        }
+
+        if (!CheckWriteAccess(console))
+        {
+            return ExitCode.AccessDenied;
+        }
+
+        try
+        {
+            await using var db = UserStore.Open();
+            var user = await UserStore.FindUserAsync(db, userName, cancellationToken);
+            if (user is null)
+            {
+                console.ReportError($"There is no user '{userName}'; add the user first with 'usbipd user add'.");
+                return ExitCode.Failure;
+            }
+            var secret = UserStore.SetNewOtpSecret(user);
+            UserStore.Audit(db, "user otp reset", user.Name);
+            _ = await db.SaveChangesAsync(cancellationToken);
+            ReportOtpSecret(user.Name, secret, console);
+            return ExitCode.Success;
+        }
+        catch (Exception ex) when (UserStore.IsDatabaseError(ex))
+        {
+            console.ReportError($"User database: {ex.Message}");
+            return ExitCode.Failure;
+        }
+    }
+
+    /// <summary>
+    /// Shows the secret once, for the user's authenticator app. It cannot be shown again; a lost secret needs a reset.
+    /// </summary>
+    static void ReportOtpSecret(string userName, byte[] secret, IConsole console)
+    {
+        var issuer = Totp.GetIssuer(Data.Database.LoadConfiguration());
+        var base32 = Totp.ToBase32(secret);
+        var grouped = string.Join(' ', Enumerable.Range(0, (base32.Length + 3) / 4)
+            .Select(i => base32.Substring(i * 4, Math.Min(4, base32.Length - (i * 4)))));
+        console.Out.WriteLine($"""
+
+            One-time password secret for '{userName}'. Add it to the user's authenticator app now; it is not shown again.
+              Issuer:   {issuer}
+              Account:  {userName}
+              Secret:   {grouped}
+              Type:     time-based (TOTP), SHA-1, {Totp.Digits} digits, {Totp.StepSeconds} seconds
+              Key URI:  {Totp.GetKeyUri(issuer, userName, secret)}
+
+            """);
+        console.ReportWarning("Anyone who sees this secret can generate the user's codes; clear the screen after enrollment.");
     }
 
     async Task<ExitCode> ICommandHandlers.UserList(IConsole console, CancellationToken cancellationToken)
@@ -99,7 +169,7 @@ sealed partial class CommandHandlers : ICommandHandlers
         var boundDevices = Data.BindStore.GetBoundDevices().ToList();
 #pragma warning disable CA1849 // Call async methods when in an async method (console output, as the other list commands)
         console.Out.WriteLine("Users:");
-        console.Out.WriteLine($"{"USER",-24}  {"BUSID",-5}  {"STATE",-22}  DEVICE");
+        console.Out.WriteLine($"{"USER",-24}  {"OTP",-7}  {"BUSID",-5}  {"STATE",-22}  DEVICE");
         foreach (var user in users)
         {
             string state;
@@ -125,6 +195,7 @@ sealed partial class CommandHandlers : ICommandHandlers
                 }
             }
             console.Out.Write($"{user.UserName,-24}  ");
+            console.Out.Write($"{(user.HasOtpSecret ? "Set" : "Not set"),-7}  ");
             console.Out.Write($"{busIdText,-5}  ");
             console.Out.Write($"{state,-22}  ");
             console.Out.WriteLine(user.Description ?? "-");
