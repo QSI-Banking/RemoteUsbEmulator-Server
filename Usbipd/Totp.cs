@@ -103,11 +103,11 @@ static class Totp
 
     /// <summary>
     /// The key URI that authenticator apps import (also the content of the enrollment QR code).
+    /// SHA-1, 6 digits and 30 seconds are the defaults of the format, so they are left out: a shorter URI is a smaller QR code.
     /// </summary>
     public static string GetKeyUri(string issuer, string account, ReadOnlySpan<byte> secret)
     {
         var label = Uri.EscapeDataString($"{issuer}:{account}");
-        return $"otpauth://totp/{label}?secret={ToBase32(secret)}&issuer={Uri.EscapeDataString(issuer)}" +
-            $"&algorithm=SHA1&digits={Digits}&period={StepSeconds}";
+        return $"otpauth://totp/{label}?secret={ToBase32(secret)}&issuer={Uri.EscapeDataString(issuer)}";
     }
 }

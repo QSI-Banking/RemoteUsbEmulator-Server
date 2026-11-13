@@ -100,7 +100,7 @@ sealed class UserAuth_Tests
     public void Totp_KeyUri()
     {
         Assert.AreEqual(
-            "otpauth://totp/QSI%20USB%2FIP%3Aalice?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=QSI%20USB%2FIP&algorithm=SHA1&digits=6&period=30",
+            "otpauth://totp/QSI%20USB%2FIP%3Aalice?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=QSI%20USB%2FIP",
             Totp.GetKeyUri("QSI USB/IP", "alice", RfcSecret));
     }
 

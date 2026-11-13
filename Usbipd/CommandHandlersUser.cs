@@ -144,16 +144,16 @@ sealed partial class CommandHandlers : ICommandHandlers
         var base32 = Totp.ToBase32(secret);
         var grouped = string.Join(' ', Enumerable.Range(0, (base32.Length + 3) / 4)
             .Select(i => base32.Substring(i * 4, Math.Min(4, base32.Length - (i * 4)))));
+        var keyUri = Totp.GetKeyUri(issuer, userName, secret);
         var shown = SecretDisplay.Show(console, $"""
-            One-time password secret for '{userName}'. Add it to the user's authenticator app now; it is not shown again.
-            Anyone who sees this secret can generate the user's codes.
+            One-time password secret for '{userName}'. Scan the QR code with the user's authenticator app now, or enter
+            the secret by hand; it is not shown again. Anyone who sees this secret can generate the user's codes.
 
               Issuer:   {issuer}
               Account:  {userName}
               Secret:   {grouped}
               Type:     time-based (TOTP), SHA-1, {Totp.Digits} digits, {Totp.StepSeconds} seconds
-              Key URI:  {Totp.GetKeyUri(issuer, userName, secret)}
-            """);
+            """, keyUri);
         if (shown)
         {
             console.ReportInfo($"The secret for '{userName}' was shown and removed from the screen.");
