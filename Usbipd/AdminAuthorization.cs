@@ -15,12 +15,14 @@ namespace Usbipd;
 /// <summary>
 /// Every change asks for an administrator's Windows credentials, so that an elevated window that was left open cannot be
 /// used by someone else. The check is valid for one command, or for an admin session ('usbipd admin') until it was idle for
-/// <see cref="SessionIdleTimeout"/>. Database connections of the CLI are made as the checked account
+/// <see cref="SessionIdleTimeout"/> or lasted <see cref="SessionMaxDuration"/>; a timer then discards the sign-in token from memory.
+/// Database connections of the CLI are made as the checked account
 /// (see <see cref="Data.ImpersonatingConnectionInterceptor"/>), so the audit names the person who made the change.
 /// </summary>
 static partial class AdminAuthorization
 {
     public static readonly TimeSpan SessionIdleTimeout = TimeSpan.FromMinutes(10);
+    public static readonly TimeSpan SessionMaxDuration = TimeSpan.FromMinutes(60);
 
     const int MaxAttempts = 3;
     static readonly SecurityIdentifier AdministratorsSid = new(WellKnownSidType.BuiltinAdministratorsSid, null);
@@ -28,6 +30,9 @@ static partial class AdminAuthorization
 
     static WindowsIdentity? Current;
     static long LastUsedTimestamp;
+    static long SignedInTimestamp;
+    static Timer? ExpiryTimer;
+    static string? LockReason;
 
     /// <summary>
     /// Set by 'usbipd admin' while its session runs; otherwise a check is valid for the current command only.
@@ -35,17 +40,20 @@ static partial class AdminAuthorization
     public static bool InSession { get; set; }
 
     /// <summary>
-    /// The checked account, or <see langword="null"/>: database connections are then made as the process account.
+    /// Runs <paramref name="action"/> as the checked account, or as the process account if there is none.
+    /// Holds the lock, so the expiry timer cannot discard the token while it is in use.
     /// </summary>
-    public static WindowsIdentity? Identity
+    public static void RunAsAdministrator(Action action)
     {
-        get
+        lock (Lock)
         {
-            lock (Lock)
+            if (IsValid())
             {
-                return IsValid() ? Current : null;
+                WindowsIdentity.RunImpersonated(Current!.AccessToken, action);
+                return;
             }
         }
+        action();
     }
 
     /// <summary>
@@ -55,9 +63,12 @@ static partial class AdminAuthorization
     {
         get
         {
-            if (Identity is { } identity)
+            lock (Lock)
             {
-                return identity.Name;
+                if (IsValid())
+                {
+                    return Current!.Name;
+                }
             }
             using var processIdentity = WindowsIdentity.GetCurrent();
             return processIdentity.Name;
@@ -83,10 +94,19 @@ static partial class AdminAuthorization
             if (IsValid())
             {
                 LastUsedTimestamp = Stopwatch.GetTimestamp();
+                ScheduleExpiry();
                 return true;
             }
-            Current?.Dispose();
-            Current = null;
+            if (Current is not null)
+            {
+                LockReason ??= ExpiredReason();
+            }
+            DiscardToken();
+            if (LockReason is not null)
+            {
+                console.ReportInfo($"The admin session was locked: {LockReason}.");
+                LockReason = null;
+            }
         }
 
         var message = InSession
@@ -116,14 +136,19 @@ static partial class AdminAuthorization
                         authError = ERROR_ACCESS_DENIED;
                         continue;
                     }
+                    string name;
                     lock (Lock)
                     {
+                        DiscardToken();
                         Current = new WindowsIdentity(token.DangerousGetHandle());
-                        LastUsedTimestamp = Stopwatch.GetTimestamp();
+                        name = Current.Name;
+                        SignedInTimestamp = LastUsedTimestamp = Stopwatch.GetTimestamp();
+                        ScheduleExpiry();
                     }
                     if (InSession)
                     {
-                        console.ReportInfo($"Signed in as {Current.Name}; the session locks after {(int)SessionIdleTimeout.TotalMinutes} idle minutes.");
+                        console.ReportInfo($"Signed in as {name}; the session locks after {(int)SessionIdleTimeout.TotalMinutes} idle minutes, " +
+                            $"and after {(int)SessionMaxDuration.TotalMinutes} minutes in total.");
                     }
                     return true;
                 }
@@ -147,6 +172,7 @@ static partial class AdminAuthorization
             if (IsValid())
             {
                 LastUsedTimestamp = Stopwatch.GetTimestamp();
+                ScheduleExpiry();
             }
         }
     }
@@ -158,14 +184,73 @@ static partial class AdminAuthorization
     {
         lock (Lock)
         {
-            Current?.Dispose();
-            Current = null;
+            DiscardToken();
+            LockReason = null;
         }
     }
 
     static bool IsValid()
     {
-        return Current is not null && (!InSession || Stopwatch.GetElapsedTime(LastUsedTimestamp) < SessionIdleTimeout);
+        return Current is not null && (!InSession
+            || (Stopwatch.GetElapsedTime(LastUsedTimestamp) < SessionIdleTimeout
+                && Stopwatch.GetElapsedTime(SignedInTimestamp) < SessionMaxDuration));
+    }
+
+    static string ExpiredReason()
+    {
+        return Stopwatch.GetElapsedTime(SignedInTimestamp) >= SessionMaxDuration
+            ? $"the {(int)SessionMaxDuration.TotalMinutes} minute session limit was reached"
+            : $"no command for {(int)SessionIdleTimeout.TotalMinutes} minutes";
+    }
+
+    /// <summary>
+    /// Call with the lock held. In an admin session, arms the timer for the earlier of the idle and the total limit.
+    /// </summary>
+    static void ScheduleExpiry()
+    {
+        if (!InSession)
+        {
+            return;
+        }
+        var idleLeft = SessionIdleTimeout - Stopwatch.GetElapsedTime(LastUsedTimestamp);
+        var totalLeft = SessionMaxDuration - Stopwatch.GetElapsedTime(SignedInTimestamp);
+        var due = idleLeft < totalLeft ? idleLeft : totalLeft;
+        if (due < TimeSpan.Zero)
+        {
+            due = TimeSpan.Zero;
+        }
+        ExpiryTimer ??= new Timer(_ => OnExpiryTimer());
+        _ = ExpiryTimer.Change(due + TimeSpan.FromMilliseconds(100), Timeout.InfiniteTimeSpan);
+    }
+
+    static void OnExpiryTimer()
+    {
+        lock (Lock)
+        {
+            if (Current is null)
+            {
+                return;
+            }
+            if (IsValid())
+            {
+                // A command came in after the timer was armed.
+                ScheduleExpiry();
+                return;
+            }
+            // Discarded now; reported at the next change.
+            LockReason = ExpiredReason();
+            DiscardToken();
+        }
+    }
+
+    /// <summary>
+    /// Call with the lock held.
+    /// </summary>
+    static void DiscardToken()
+    {
+        _ = ExpiryTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+        Current?.Dispose();
+        Current = null;
     }
 
     /// <summary>

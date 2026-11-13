@@ -1012,7 +1012,8 @@ static class Program
             var adminCommand = new Command("admin", "Run several commands after one sign-in\0" + $"""
                 Every change asks for the credentials of a local administrator. An admin session asks once, \
                 then runs the commands you type until 'exit'. It locks after \
-                {(int)AdminAuthorization.SessionIdleTimeout.TotalMinutes} minutes without a command.
+                {(int)AdminAuthorization.SessionIdleTimeout.TotalMinutes} minutes without a command, \
+                and after {(int)AdminAuthorization.SessionMaxDuration.TotalMinutes} minutes in total.
                 """.Unwrap());
             adminCommand.SetAction(async (parseResult, cancellationToken) => (int)
                 await commandHandlers.Admin(console, cancellationToken)

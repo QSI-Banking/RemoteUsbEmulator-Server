@@ -37,7 +37,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             console.Out.WriteLine($"""
                 Type usbipd commands without 'usbipd', for example: user add --name alice --busid 6-2
                 'help' lists the commands, 'lock' signs out, 'exit' ends the session.
-                The session locks after {(int)AdminAuthorization.SessionIdleTimeout.TotalMinutes} minutes without a command; the next change then asks again.
+                The session locks after {(int)AdminAuthorization.SessionIdleTimeout.TotalMinutes} minutes without a command, and after {(int)AdminAuthorization.SessionMaxDuration.TotalMinutes} minutes in total; the next change then asks again.
                 """);
             while (!cancellationToken.IsCancellationRequested)
             {

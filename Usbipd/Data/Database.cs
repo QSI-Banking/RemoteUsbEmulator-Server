@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.Data.Common;
-using System.Security.Principal;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -67,11 +66,7 @@ sealed class ImpersonatingConnectionInterceptor : DbConnectionInterceptor
 
     public override InterceptionResult ConnectionOpening(DbConnection connection, ConnectionEventData eventData, InterceptionResult result)
     {
-        if (AdminAuthorization.Identity is not { } identity)
-        {
-            return result;
-        }
-        WindowsIdentity.RunImpersonated(identity.AccessToken, connection.Open);
+        AdminAuthorization.RunAsAdministrator(connection.Open);
         return InterceptionResult.Suppress();
     }
 
