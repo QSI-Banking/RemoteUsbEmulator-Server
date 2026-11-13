@@ -66,10 +66,14 @@ sealed partial class CommandHandlers : ICommandHandlers
             UserStore.Audit(db, existing is null ? "user add" : "user remap", $"{user.Name} -> {databaseDevice.InstanceId}");
             // A new user (or one without a secret yet) gets a TOTP secret; an existing secret is kept.
             byte[]? secret = null;
-            if (user.OtpSecret is null)
+            if (user.OtpSecret is null && SecretDisplay.CheckCanShow(console))
             {
                 secret = UserStore.SetNewOtpSecret(user);
                 UserStore.Audit(db, "user otp reset", user.Name);
+            }
+            else if (user.OtpSecret is null)
+            {
+                console.ReportWarning($"User '{user.Name}' has no one-time password secret yet; run 'usbipd user otp reset --name {user.Name}' in an interactive console.");
             }
             _ = await db.SaveChangesAsync(cancellationToken);
 
@@ -93,6 +97,12 @@ sealed partial class CommandHandlers : ICommandHandlers
     async Task<ExitCode> ICommandHandlers.UserOtpReset(string userName, IConsole console, CancellationToken cancellationToken)
     {
         if (!CheckInstalled(console))
+        {
+            return ExitCode.Failure;
+        }
+
+        // Before anything changes: a secret that cannot be shown must not replace one that works.
+        if (!SecretDisplay.CheckCanShow(console))
         {
             return ExitCode.Failure;
         }
@@ -125,7 +135,8 @@ sealed partial class CommandHandlers : ICommandHandlers
     }
 
     /// <summary>
-    /// Shows the secret once, for the user's authenticator app. It cannot be shown again; a lost secret needs a reset.
+    /// Shows the secret once, for the user's authenticator app, on the alternate screen (see <see cref="SecretDisplay"/>),
+    /// so it does not stay in the console. It cannot be shown again; a lost secret needs a reset.
     /// </summary>
     static void ReportOtpSecret(string userName, byte[] secret, IConsole console)
     {
@@ -133,17 +144,24 @@ sealed partial class CommandHandlers : ICommandHandlers
         var base32 = Totp.ToBase32(secret);
         var grouped = string.Join(' ', Enumerable.Range(0, (base32.Length + 3) / 4)
             .Select(i => base32.Substring(i * 4, Math.Min(4, base32.Length - (i * 4)))));
-        console.Out.WriteLine($"""
-
+        var shown = SecretDisplay.Show(console, $"""
             One-time password secret for '{userName}'. Add it to the user's authenticator app now; it is not shown again.
+            Anyone who sees this secret can generate the user's codes.
+
               Issuer:   {issuer}
               Account:  {userName}
               Secret:   {grouped}
               Type:     time-based (TOTP), SHA-1, {Totp.Digits} digits, {Totp.StepSeconds} seconds
               Key URI:  {Totp.GetKeyUri(issuer, userName, secret)}
-
             """);
-        console.ReportWarning("Anyone who sees this secret can generate the user's codes; clear the screen after enrollment.");
+        if (shown)
+        {
+            console.ReportInfo($"The secret for '{userName}' was shown and removed from the screen.");
+        }
+        else
+        {
+            console.ReportWarning($"User '{userName}' has a new secret that was not shown; codes from an earlier secret no longer work.");
+        }
     }
 
     async Task<ExitCode> ICommandHandlers.UserList(IConsole console, CancellationToken cancellationToken)
