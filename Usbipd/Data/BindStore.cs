@@ -92,6 +92,118 @@ static class BindStore
     }
 
     /// <summary>
+    /// What was recorded for a bind, and whether it is confirmed for a run of the service.
+    /// </summary>
+    internal sealed record BindInfo(Guid Guid, string InstanceId, string Description, string? Fingerprint, string? LocationPath,
+        string? HardwareId, string? SerialNumber, string? Interfaces, Guid? ConfirmedRunId);
+
+    /// <summary>
+    /// The binds of this server.
+    /// </summary>
+    public static List<BindInfo> GetBindInfos()
+    {
+        var serverName = UserStore.ServerName;
+        using var db = UserStore.Open();
+        return [.. db.Binds.AsNoTracking()
+            .Where(b => b.Device!.ServerName == serverName)
+            .Select(b => new BindInfo(b.Id, b.Device!.InstanceId, b.Device.Description, b.Fingerprint, b.LocationPath,
+                b.HardwareId, b.SerialNumber, b.Interfaces, b.ConfirmedRunId))];
+    }
+
+    /// <summary>
+    /// The run of the service on this server as last written by it, or <see langword="null"/>.
+    /// Only current while the service is running (see <see cref="Server.IsRunning"/>).
+    /// </summary>
+    public static Guid? GetServiceRunId()
+    {
+        var serverName = UserStore.ServerName;
+        using var db = UserStore.Open();
+        return db.ServerRuns.AsNoTracking().Where(r => r.ServerName == serverName).Select(r => (Guid?)r.RunId).SingleOrDefault();
+    }
+
+    /// <summary>
+    /// Called by the service at every start: binds confirmed in an earlier run are no longer valid.
+    /// </summary>
+    public static void StartServiceRun(Guid runId)
+    {
+        var serverName = UserStore.ServerName;
+        using var db = UserStore.Open();
+        var run = db.ServerRuns.SingleOrDefault(r => r.ServerName == serverName);
+        if (run is null)
+        {
+            run = new() { ServerName = serverName };
+            _ = db.ServerRuns.Add(run);
+        }
+        run.RunId = runId;
+        run.StartedUtc = DateTime.UtcNow;
+        _ = db.SaveChanges();
+    }
+
+    /// <summary>
+    /// An administrator confirms that the device now present is the one to share: records its identity and the run of the service.
+    /// </summary>
+    /// <param name="runId"><see langword="null"/> while the service is not running; the bind then needs a review after it starts.</param>
+    /// <returns><see langword="false"/> if the bind no longer exists (the service dropped it because the device was removed).</returns>
+    public static bool Confirm(Guid guid, DeviceIdentity identity, Guid? runId, bool review)
+    {
+        var serverName = UserStore.ServerName;
+        var account = UserStore.CurrentAccount;
+        var now = DateTime.UtcNow;
+        using var db = UserStore.Open();
+        var updated = db.Binds.Where(b => b.Id == guid && b.Device!.ServerName == serverName)
+            .ExecuteUpdate(s => s
+                .SetProperty(b => b.Fingerprint, identity.Fingerprint)
+                .SetProperty(b => b.LocationPath, identity.LocationPath)
+                .SetProperty(b => b.HardwareId, identity.HardwareId)
+                .SetProperty(b => b.SerialNumber, identity.SerialNumber)
+                .SetProperty(b => b.Interfaces, identity.Interfaces)
+                .SetProperty(b => b.ConfirmedRunId, runId)
+                .SetProperty(b => b.ConfirmedUtc, now)
+                .SetProperty(b => b.ConfirmedBy, account));
+        if (updated == 0)
+        {
+            return false;
+        }
+        UserStore.Audit(db, review ? "bind review" : "bind confirm", $"{guid:B} {identity.HardwareId} {identity.LocationPath} {identity.Fingerprint}");
+        _ = db.SaveChanges();
+        return true;
+    }
+
+    /// <summary>
+    /// The form of an instance ID inside a device interface path (which is what a removal event names):
+    /// upper case, with '#' for '\'.
+    /// </summary>
+    public static string GetInterfaceKey(string instanceId)
+    {
+        return instanceId.ToUpperInvariant().Replace('\\', '#');
+    }
+
+    /// <summary>
+    /// Called by the service when a bound device was removed (unplugged, moved, disabled or its driver changed):
+    /// drops the binds of the device on this server, with their attachments.
+    /// </summary>
+    /// <param name="interfaceKey">See <see cref="GetInterfaceKey"/>.</param>
+    /// <returns>The dropped binds.</returns>
+    public static List<(Guid Guid, string InstanceId)> DropBindsOfRemovedDevice(string interfaceKey)
+    {
+        var serverName = UserStore.ServerName;
+        using var db = UserStore.Open();
+        var binds = db.Binds.Include(b => b.Device).Where(b => b.Device!.ServerName == serverName).ToList()
+            .Where(b => GetInterfaceKey(b.Device!.InstanceId) == interfaceKey).ToList();
+        if (binds.Count == 0)
+        {
+            return [];
+        }
+        db.Binds.RemoveRange(binds);
+        foreach (var bind in binds)
+        {
+            UserStore.Audit(db, "bind dropped", $"{bind.Device!.InstanceId} {bind.Id:B} (device removed)");
+        }
+        _ = db.SaveChanges();
+        return [.. binds.Select(b => (b.Id, b.Device!.InstanceId))];
+    }
+
+    /// <summary>
     /// 'usbipd unbind'. Also ends its attachment (the service then detaches the device).
     /// </summary>
     public static void StopSharingDevice(Guid guid)

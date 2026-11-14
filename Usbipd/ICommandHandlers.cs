@@ -42,6 +42,7 @@ interface ICommandHandlers
     Task<ExitCode> ClientDisable(string thumbprint, IConsole console, CancellationToken cancellationToken);
     Task<ExitCode> ClientRemove(string thumbprint, IConsole console, CancellationToken cancellationToken);
     Task<ExitCode> Admin(IConsole console, CancellationToken cancellationToken);
+    Task<ExitCode> BindReview(bool yes, IConsole console, CancellationToken cancellationToken);
 
     // Server
     Task<ExitCode> Server(string[] args, IConsole console, CancellationToken cancellationToken);

@@ -27,6 +27,8 @@ sealed class UsbipdDbContext(DbContextOptions<UsbipdDbContext> options) : DbCont
     public DbSet<ClientCertificate> ClientCertificates => Set<ClientCertificate>();
 
     public DbSet<OtpSecret> OtpSecrets => Set<OtpSecret>();
+
+    public DbSet<ServerRun> ServerRuns => Set<ServerRun>();
     public DbSet<AdminAuditEntry> AdminAudit => Set<AdminAuditEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -75,6 +77,21 @@ sealed class UsbipdDbContext(DbContextOptions<UsbipdDbContext> options) : DbCont
                 .OnDelete(DeleteBehavior.Restrict);
             _ = entity.Property(b => b.CreatedUtc).HasColumnType("datetime2");
             _ = entity.Property(b => b.CreatedBy).HasMaxLength(256).IsRequired();
+            _ = entity.Property(b => b.Fingerprint).HasMaxLength(64).IsUnicode(false);
+            _ = entity.Property(b => b.LocationPath).HasMaxLength(400);
+            _ = entity.Property(b => b.HardwareId).HasMaxLength(9).IsUnicode(false);
+            _ = entity.Property(b => b.SerialNumber).HasMaxLength(200);
+            _ = entity.Property(b => b.Interfaces).HasMaxLength(400);
+            _ = entity.Property(b => b.ConfirmedUtc).HasColumnType("datetime2");
+            _ = entity.Property(b => b.ConfirmedBy).HasMaxLength(256);
+        });
+
+        _ = modelBuilder.Entity<ServerRun>(entity =>
+        {
+            _ = entity.ToTable("ServerRuns");
+            _ = entity.HasKey(r => r.ServerName);
+            _ = entity.Property(r => r.ServerName).HasMaxLength(256);
+            _ = entity.Property(r => r.StartedUtc).HasColumnType("datetime2");
         });
 
         _ = modelBuilder.Entity<Attachment>(entity =>

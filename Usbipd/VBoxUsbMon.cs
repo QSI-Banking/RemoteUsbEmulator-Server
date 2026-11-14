@@ -8,10 +8,13 @@ using System.Runtime.InteropServices;
 using System.ServiceProcess;
 using static Usbipd.Interop.VBoxUsb;
 using static Usbipd.Interop.VBoxUsbMon;
-using static Usbipd.Tools;
 
 namespace Usbipd;
 
+/// <summary>
+/// The VBoxUSBMon driver is installed because the VBoxUSB device driver needs it; this server only checks that it runs.
+/// Capturing devices on demand through its filters is not used: every shared device is bound to VBoxUSB by an administrator.
+/// </summary>
 sealed partial class VBoxUsbMon : IDisposable
 {
     readonly DeviceFile UsbMonitor = new(USBMON_DEVICE_NAME);
@@ -44,35 +47,6 @@ sealed partial class VBoxUsbMon : IDisposable
         var output = new byte[Unsafe.SizeOf<UsbSupVersion>()];
         _ = await UsbMonitor.IoControlAsync(SUPUSBFLT_IOCTL.GET_VERSION, null, output);
         return MemoryMarshal.AsRef<UsbSupVersion>(output);
-    }
-
-    public async Task<ulong> AddFilter(ExportedDevice device)
-    {
-        var filter = UsbFilter.Create(UsbFilterType.CAPTURE);
-        filter.SetMatch(UsbFilterIdx.VENDOR_ID, UsbFilterMatch.NUM_EXACT, device.VendorId);
-        filter.SetMatch(UsbFilterIdx.PRODUCT_ID, UsbFilterMatch.NUM_EXACT, device.ProductId);
-        filter.SetMatch(UsbFilterIdx.DEVICE_REV, UsbFilterMatch.NUM_EXACT, device.BcdDevice);
-        filter.SetMatch(UsbFilterIdx.DEVICE_CLASS, UsbFilterMatch.NUM_EXACT, device.DeviceClass);
-        filter.SetMatch(UsbFilterIdx.DEVICE_SUB_CLASS, UsbFilterMatch.NUM_EXACT, device.DeviceSubClass);
-        filter.SetMatch(UsbFilterIdx.DEVICE_PROTOCOL, UsbFilterMatch.NUM_EXACT, device.DeviceProtocol);
-        filter.SetMatch(UsbFilterIdx.PORT, UsbFilterMatch.NUM_EXACT, device.BusId.Port);
-
-        var output = new byte[Unsafe.SizeOf<UsbSupFltAddOut>()];
-        _ = await UsbMonitor.IoControlAsync(SUPUSBFLT_IOCTL.ADD_FILTER, StructToBytes(filter), output);
-        ref readonly var fltAddOut = ref MemoryMarshal.AsRef<UsbSupFltAddOut>(output);
-        return fltAddOut.rc == 0 ? fltAddOut.uId
-            : throw new UnexpectedResultException($"SUPUSBFLT_IOCTL_ADD_FILTER failed with returnCode {fltAddOut.rc}");
-    }
-
-    public async Task RemoveFilter(ulong filterId)
-    {
-        var output = new byte[sizeof(int)];
-        _ = await UsbMonitor.IoControlAsync(SUPUSBFLT_IOCTL.REMOVE_FILTER, BitConverter.GetBytes(filterId), output);
-        ref readonly var rc = ref MemoryMarshal.AsRef<int>(output);
-        if (rc != 0 /* VINF_SUCCESS */)
-        {
-            throw new UnexpectedResultException($"SUPUSBFLT_IOCTL_REMOVE_FILTER failed with returnCode {rc}");
-        }
     }
 
     bool IsDisposed;

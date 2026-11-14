@@ -24,6 +24,9 @@ static class DatabaseCommands
         GRANT SELECT ON SCHEMA::[usbipd] TO [usbipd_service];
         GRANT INSERT, UPDATE, DELETE ON OBJECT::[usbipd].[Attachments] TO [usbipd_service];
         GRANT UPDATE ([LastAcceptedStep]) ON OBJECT::[usbipd].[OtpSecrets] TO [usbipd_service];
+        GRANT DELETE ON OBJECT::[usbipd].[Binds] TO [usbipd_service];
+        GRANT INSERT, UPDATE ON OBJECT::[usbipd].[ServerRuns] TO [usbipd_service];
+        GRANT INSERT ON OBJECT::[usbipd].[AdminAudit] TO [usbipd_service];
         GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[usbipd] TO [usbipd_admin];
         """;
 

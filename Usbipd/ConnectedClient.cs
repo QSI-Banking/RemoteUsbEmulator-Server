@@ -20,8 +20,9 @@ using static Usbipd.Interop.UsbIp;
 namespace Usbipd;
 
 sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clientContext, IServiceProvider serviceProvider,
-    IUserAuthenticator userAuthenticator, IUserDeviceMap userDeviceMap, SessionRegistry sessionRegistry)
+    IUserAuthenticator userAuthenticator, IUserDeviceMap userDeviceMap, SessionRegistry sessionRegistry, BindWatcher bindWatcher)
 {
+    readonly BindWatcher BindWatcher = bindWatcher;
     readonly ILogger Logger = logger;
     readonly ClientContext ClientContext = clientContext;
     readonly IServiceProvider ServiceProvider = serviceProvider;
@@ -210,7 +211,6 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
         // whatever happens, try to report "something" to the client
         var status = Status.ST_ERROR;
 
-        VBoxUsbMon? mon = null;
         try
         {
             // Only the device mapped to the authenticated user may be imported (no policy auto-bind).
@@ -273,32 +273,25 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
 
             status = Status.ST_NA;
 
-            ulong filterId = 0;
+            // The bind must be valid: confirmed by an administrator in this run of the service, the device not removed since,
+            // and the device that is present must be the one that was recorded. Devices are always on the VBoxUSB driver
+            // (forced bind); the driver is never switched for an attach.
+            string? invalidReason;
             try
             {
-                if (!WindowsDevice.TryCreate(device.InstanceId, out var windowsDevice))
-                {
-                    await SendOpCodeAsync(OpCode.OP_REP_IMPORT, Status.ST_NODEV);
-                    return;
-                }
-                // We use the modern way to restart the device, which works much better than the obsolete VBoxUsbMon port cycling.
-                using var restartingDevice = new RestartingDevice(windowsDevice);
-                if (!windowsDevice.HasVBoxDriver)
-                {
-                    mon = new VBoxUsbMon();
-                    var version = await mon.GetVersion();
-                    if (!VBoxUsbMon.IsVersionSupported(version))
-                    {
-                        throw new NotSupportedException($"VBoxUsbMon version {version.major}.{version.minor} is not supported.");
-                    }
-                    filterId = await mon.AddFilter(exportedDevice);
-                }
+                invalidReason = await BindWatcher.GetInvalidReasonAsync(device.PersistedGuid.Value, device.InstanceId);
             }
-            catch (ConfigurationManagerException ex) when (ex.ConfigRet == CONFIGRET.CR_REMOVE_VETOED)
+            catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))
             {
-                // The host is actively using the device.
-                status = Status.ST_DEV_BUSY;
-                throw;
+                Logger.UserDatabaseUnavailable(ClientContext.ClientAddress, ClientContext.AuthenticatedUser, ex.Message);
+                await SendOpCodeAsync(OpCode.OP_REP_IMPORT, Status.ST_SERVER_UNAVAILABLE);
+                return;
+            }
+            if (invalidReason is not null)
+            {
+                Logger.ClientBindInvalid(ClientContext.ClientAddress, ClientContext.AuthenticatedUser, busId, invalidReason);
+                await SendOpCodeAsync(OpCode.OP_REP_IMPORT, Status.ST_NODEV);
+                return;
             }
 
             status = Status.ST_DEV_ERR;
@@ -311,6 +304,20 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
                 Logger.Debug($"Claiming took {sw.ElapsedMilliseconds} ms");
             }
             ClientContext.AttachedBusId = device.BusId;
+
+            // Every session starts with a freshly reset device, whatever state an earlier session left it in.
+            // This is a port reset inside the driver; Windows does not see the device removed.
+            try
+            {
+                _ = await ClientContext.AttachedDevice.IoControlAsync(Interop.VBoxUsb.SUPUSB_IOCTL.USB_RESET, null, null);
+            }
+            catch (System.ComponentModel.Win32Exception ex)
+            {
+                if (Logger.IsEnabled(LogLevel.Debug))
+                {
+                    Logger.Debug($"Device reset before attach failed: {ex.Message}");
+                }
+            }
 
             CM_Unregister_NotificationSafeHandle? notification = null;
             Logger.ClientAttach(ClientContext.ClientAddress, busId, device.InstanceId);
@@ -393,21 +400,6 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
                 {
                     Logger.SessionRevoked(ClientContext.ClientAddress, session.UserName, busId, reason);
                 }
-
-                try
-                {
-                    // We use the modern way to restart the device, which works much better than the obsolete VBoxUsbMon port cycling.
-                    using var restartingDevice = new RestartingDevice(vboxDevice);
-                    if (mon is not null)
-                    {
-                        await mon.RemoveFilter(filterId);
-                    }
-                }
-                catch (ConfigurationManagerException ex)
-                {
-                    // Windows did not take the device back; it may need to be replugged.
-                    Logger.DeviceRestartFailed(busId, device.InstanceId, ex.Message);
-                }
             }
         }
         catch
@@ -425,10 +417,6 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
 #pragma warning restore CA1031 // Do not catch general exception types
             }
             throw;
-        }
-        finally
-        {
-            mon?.Dispose();
         }
     }
 

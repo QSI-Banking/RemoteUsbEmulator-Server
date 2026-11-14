@@ -122,15 +122,26 @@ sealed partial class CommandHandlers : ICommandHandlers
 
 #pragma warning disable CA1849 // Call async methods when in an async method
         var allDevices = DeviceExtensions.GetAll().ToList();
+        // A bind is valid only if it was confirmed in the current run of the service (see BindWatcher).
+        var serviceRunId = Server.IsRunning() ? Data.BindStore.GetServiceRunId() : null;
+        var validBinds = new HashSet<Guid>();
+        if (serviceRunId is not null)
+        {
+            validBinds.UnionWith(Data.BindStore.GetBindInfos().Where(b => b.ConfirmedRunId == serviceRunId).Select(b => b.Guid));
+        }
+        var needsReview = false;
         console.Out.WriteLine("Connected:");
         console.Out.WriteLine($"{"BUSID",-5}  {"VID:PID",-9}  {"DEVICE",-60}  STATE");
         foreach (var device in allDevices.Where(d => d.BusId.HasValue).OrderBy(d => d.BusId.GetValueOrDefault()))
         {
             Debug.Assert(device.BusId.HasValue);
             var state = device.ClientIPAddress is not null ? "Attached"
-                : device.PersistedGuid is not null ? device.IsForced ? "Shared (forced)" : "Shared"
+                : device.PersistedGuid is Guid guid
+                    ? (!device.IsForced ? "Needs bind (driver lost)" : validBinds.Contains(guid) ? "Shared" : "Needs review")
                 : device.BusId.Value.IsIncompatibleHub ? "Incompatible hub"
+                : device.IsForced ? "Quarantined"
                 : Policy.IsAutoBindAllowed(device) ? "Allowed" : "Not shared";
+            needsReview |= state is "Needs review" or "Needs bind (driver lost)" or "Quarantined";
             console.Out.Write($"{(device.BusId.Value.IsIncompatibleHub ? string.Empty : device.BusId.Value),-5}  ");
             console.Out.Write($"{device.HardwareId,-9}  ");
             console.WriteTruncated(GetDescription(device, usbIds), 60, true);
@@ -153,77 +164,13 @@ sealed partial class CommandHandlers : ICommandHandlers
         }
 
         _ = console.CheckAndReportServerRunning(false);
-        console.ReportIfForceNeeded();
+        if (needsReview)
+        {
+            console.ReportWarning("Devices that need a review or a bind cannot be attached: 'usbipd bind --review' confirms shared devices after " +
+                "a service start; a quarantined device (its bind was dropped when it was removed) needs 'usbipd bind' or 'usbipd unbind'.");
+        }
         return Task.FromResult(ExitCode.Success);
 #pragma warning restore CA1849 // Call async methods when in an async method
-    }
-
-    static ExitCode Bind(BusId busId, bool force, IConsole console)
-    {
-        var device = DeviceExtensions.GetAll().SingleOrDefault(d => d.BusId.HasValue && d.BusId.Value == busId);
-        if (device is null)
-        {
-            console.ReportError($"There is no device with busid '{busId}'.");
-            return ExitCode.Failure;
-        }
-        if (device.PersistedGuid.HasValue && (force == device.IsForced))
-        {
-            // Not an error, just let the user know they just executed a no-op.
-            console.ReportInfo($"Device with busid '{busId}' was already shared.");
-            if (!device.IsForced)
-            {
-                console.ReportIfForceNeeded();
-            }
-            return ExitCode.Success;
-        }
-        if (!CheckWriteAccess(console))
-        {
-            return ExitCode.AccessDenied;
-        }
-        if (!device.PersistedGuid.HasValue)
-        {
-            _ = Data.BindStore.Persist(device.InstanceId, device.Description);
-        }
-        if (!force)
-        {
-            // Do not warn that force may be needed if the user is actually using --force.
-            console.ReportIfForceNeeded();
-        }
-        if (force != device.IsForced)
-        {
-            // Switch driver.
-            if (WindowsDevice.TryCreate(device.InstanceId, out var windowsDevice))
-            {
-                if (force ? DriverTools.ForceVBoxDriver(windowsDevice) : DriverTools.UnforceVBoxDriver(windowsDevice))
-                {
-                    console.ReportRebootRequired();
-                }
-            }
-        }
-        _ = console.CheckAndReportServerRunning(false);
-        return ExitCode.Success;
-    }
-
-    Task<ExitCode> ICommandHandlers.Bind(BusId busId, bool force, IConsole console, CancellationToken cancellationToken)
-    {
-        if (!CheckInstalled(console))
-        {
-            return Task.FromResult(ExitCode.Failure);
-        }
-
-        return Task.FromResult(Bind(busId, force, console));
-    }
-
-    Task<ExitCode> ICommandHandlers.Bind(VidPid vidPid, bool force, IConsole console, CancellationToken cancellationToken)
-    {
-        if (!CheckInstalled(console))
-        {
-            return Task.FromResult(ExitCode.Failure);
-        }
-
-        return GetBusIdByHardwareId(vidPid, console) is BusId busId
-            ? Task.FromResult(Bind(busId, force, console))
-            : Task.FromResult(ExitCode.Failure);
     }
 
     Task<ExitCode> ICommandHandlers.Unbind(BusId busId, IConsole console, CancellationToken cancellationToken)
@@ -239,7 +186,8 @@ sealed partial class CommandHandlers : ICommandHandlers
             console.ReportError($"There is no device with busid '{busId}'.");
             return Task.FromResult(ExitCode.Failure);
         }
-        if (device.PersistedGuid is null)
+        // A device that still has the VBoxUSB driver without a bind is quarantined (its bind was dropped); unbind releases it.
+        if (device.PersistedGuid is null && !device.IsForced)
         {
             // Not an error, just let the user know they just executed a no-op.
             console.ReportInfo($"Device with busid '{busId}' was already not shared.");
@@ -249,7 +197,10 @@ sealed partial class CommandHandlers : ICommandHandlers
         {
             return Task.FromResult(ExitCode.AccessDenied);
         }
-        Data.BindStore.StopSharingDevice(device.PersistedGuid.Value);
+        if (device.PersistedGuid is not null)
+        {
+            Data.BindStore.StopSharingDevice(device.PersistedGuid.Value);
+        }
         if (WindowsDevice.TryCreate(device.InstanceId, out var windowsDevice))
         {
             if (DriverTools.UnforceVBoxDriver(windowsDevice))

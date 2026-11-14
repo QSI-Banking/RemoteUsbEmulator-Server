@@ -64,6 +64,8 @@ sealed partial class CommandHandlers : ICommandHandlers
                 .AddSingleton<IClientAllowList, SqlClientAllowList>()
                 .AddSingleton<SessionRegistry>()
                 .AddHostedService<SessionMonitor>()
+                .AddSingleton<BindWatcher>()
+                .AddHostedService(provider => provider.GetRequiredService<BindWatcher>())
                 .AddScoped<ClientContext>()
                 .AddScoped<ConnectedClient>()
                 .AddScoped<AttachedClient>()

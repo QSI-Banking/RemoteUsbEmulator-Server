@@ -371,7 +371,24 @@ static class Program
             //
             var forceOption = new Option<bool>("--force", "-f")
             {
-                Description = "Force binding; the host cannot use the device",
+                Description = "Accepted for compatibility; every bind is forced",
+                Arity = ArgumentArity.Zero,
+                Hidden = true,
+            };
+            //
+            //  bind [--review]
+            //
+            var reviewOption = new Option<bool>("--review", "-r")
+            {
+                Description = "Review the shared devices after a start of the service",
+                Arity = ArgumentArity.Zero,
+            };
+            //
+            //  bind [--yes]
+            //
+            var yesOption = new Option<bool>("--yes", "-y")
+            {
+                Description = "With '--review': confirm every device that matches, without asking",
                 Arity = ArgumentArity.Zero,
             };
             //
@@ -392,19 +409,27 @@ static class Program
             //
             var bindCommand = new Command("bind", "Bind device\0" + $"""
                 Registers a single USB device for sharing, so it can be attached to other machines. \
-                Unless the '--force' option is used, shared devices remain available to the host \
-                until they are attached to another machine.
+                The device gets the VBoxUSB driver, so this computer can no longer use it, and what the device is \
+                (port, VID:PID, serial number, USB descriptors) is recorded.
 
-                {OneOfRequiredText(busIdOption, hardwareIdOption)}
+                A bind is dropped as soon as the device is unplugged, moved or replaced; bind it again to share it. \
+                After every start of the service (also after a reboot) all shared devices need a review ('--review'): \
+                each device is compared with what was recorded and you confirm it.
+
+                {OneOfRequiredText(busIdOption, hardwareIdOption, reviewOption)}
                 """.Unwrap())
             {
                 busIdOption,
                 forceOption,
                 hardwareIdOption,
+                reviewOption,
+                yesOption,
             };
-            bindCommand.Validators.Add(commandResult => ValidateOneOf(commandResult, busIdOption, hardwareIdOption));
+            bindCommand.Validators.Add(commandResult => ValidateOneOf(commandResult, busIdOption, hardwareIdOption, reviewOption));
             bindCommand.SetAction(async (parseResult, cancellationToken) => (int)(
-                parseResult.GetResult(busIdOption) is not null
+                parseResult.GetValue(reviewOption)
+                    ? await commandHandlers.BindReview(parseResult.GetValue(yesOption), console, cancellationToken)
+                : parseResult.GetResult(busIdOption) is not null
                     ? await commandHandlers.Bind(parseResult.GetRequiredValue(busIdOption),
                             parseResult.GetValue(forceOption),
                             console, cancellationToken)

@@ -222,6 +222,24 @@ sealed partial class WindowsDevice : IEquatable<WindowsDevice>
     }
 
     /// <summary>
+    /// CM_DEVCAP_UNIQUEID: the last part of the instance ID is the USB serial number of the device.
+    /// Without it, that part is made up from the hub port, so the instance ID names the port and not the device.
+    /// </summary>
+    public bool HasUniqueId => TryGetProperty(Node, PInvoke.DEVPKEY_Device_Capabilities, out uint capabilities) && (capabilities & 0x10) != 0;
+
+    /// <summary>
+    /// The USB serial number, or <see langword="null"/> if the device does not report a unique one.
+    /// </summary>
+    public string? SerialNumber => HasUniqueId ? InstanceId[(InstanceId.LastIndexOf('\\') + 1)..] : null;
+
+    /// <summary>
+    /// Where the device is plugged in, as a path of controller and hub ports (for example PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(2));
+    /// <see langword="null"/> if Windows does not know.
+    /// </summary>
+    public string? LocationPath => TryGetProperty(Node, PInvoke.DEVPKEY_Device_LocationPaths, out string[] paths) && paths.Length > 0
+        ? paths[0] : null;
+
+    /// <summary>
     /// true if the device is using the VBoxUSB driver (i.e., either a stub device, or a forced-bound device).
     /// </summary>
     public bool HasVBoxDriver => TryGetProperty(Node, PInvoke.DEVPKEY_Device_MatchingDeviceId, out string matchingDeviceId)

@@ -81,6 +81,18 @@ static partial class LogEvents
     [LoggerMessage(24, LogLevel.Warning, "Attachment records of an earlier run could not be removed from the database: {reason}")]
     public static partial void StaleAttachmentsNotCleared(this ILogger logger, string reason);
 
+    [LoggerMessage(25, LogLevel.Warning, "Device {instanceId} was removed; its bind {guid} is dropped. Bind the device again to share it.")]
+    public static partial void BindDropped(this ILogger logger, string instanceId, Guid guid);
+
+    [LoggerMessage(26, LogLevel.Warning, "{count} shared device(s) need a review since the service started; attaches to them are refused until an administrator runs 'usbipd bind --review'.")]
+    public static partial void BindsNeedReview(this ILogger logger, int count);
+
+    [LoggerMessage(27, LogLevel.Warning, "Shared devices cannot be watched or updated in the database: {reason}")]
+    public static partial void BindWatchFailed(this ILogger logger, string reason);
+
+    [LoggerMessage(28, LogLevel.Warning, "Client {clientAddress} (user '{userName}'): the device at {busId} is not shared: {reason}")]
+    public static partial void ClientBindInvalid(this ILogger logger, IPAddress clientAddress, string userName, BusId busId, string reason);
+
     [LoggerMessage(1000, LogLevel.Debug, "{text}")]
     public static partial void Debug(this ILogger logger, string text);
 

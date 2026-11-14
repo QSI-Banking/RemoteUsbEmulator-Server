@@ -140,4 +140,28 @@ sealed class Parse_bind_Tests
     {
         Test(ExitCode.ParseError, "bind", "--busid", TestBusId.ToString(), "stray-argument");
     }
+
+    [TestMethod]
+    public void ReviewSuccess()
+    {
+        var mock = CreateMock();
+        mock.Setup(m => m.BindReview(false, It.IsNotNull<IConsole>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult(ExitCode.Success));
+
+        Test(ExitCode.Success, mock, "bind", "--review");
+    }
+
+    [TestMethod]
+    public void ReviewYesSuccess()
+    {
+        var mock = CreateMock();
+        mock.Setup(m => m.BindReview(true, It.IsNotNull<IConsole>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult(ExitCode.Success));
+
+        Test(ExitCode.Success, mock, "bind", "--review", "--yes");
+    }
+
+    [TestMethod]
+    public void ReviewWithBusIdFails()
+    {
+        Test(ExitCode.ParseError, "bind", "--review", "--busid", TestBusId.ToString());
+    }
 }

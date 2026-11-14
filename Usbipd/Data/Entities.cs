@@ -80,6 +80,11 @@ sealed class Device
 
 /// <summary>
 /// A shared device ('usbipd bind'). Unbind deletes the row; a rebind gets a new GUID.
+/// <para>
+/// A bind is only valid while the service has watched the device without a break since an administrator confirmed it:
+/// <see cref="ConfirmedRunId"/> must be the current run of the service (see <see cref="ServerRun"/>), and the service
+/// deletes the bind as soon as the device is removed.
+/// </para>
 /// </summary>
 sealed class Bind
 {
@@ -97,6 +102,40 @@ sealed class Bind
     public string CreatedBy { get; set; } = string.Empty;
 
     public Attachment? Attachment { get; set; }
+
+    /// <summary>
+    /// Recorded when the bind is confirmed, see <see cref="DeviceIdentity"/>; <see langword="null"/> until then.
+    /// </summary>
+    public string? Fingerprint { get; set; }
+
+    public string? LocationPath { get; set; }
+
+    public string? HardwareId { get; set; }
+
+    public string? SerialNumber { get; set; }
+
+    public string? Interfaces { get; set; }
+
+    /// <summary>
+    /// The run of the service in which an administrator confirmed the bind ('usbipd bind', 'usbipd bind --review').
+    /// </summary>
+    public Guid? ConfirmedRunId { get; set; }
+
+    public DateTime? ConfirmedUtc { get; set; }
+
+    public string? ConfirmedBy { get; set; }
+}
+
+/// <summary>
+/// The current run of the service on a server; a new one for every start. Written by the service.
+/// </summary>
+sealed class ServerRun
+{
+    public string ServerName { get; set; } = string.Empty;
+
+    public Guid RunId { get; set; }
+
+    public DateTime StartedUtc { get; set; }
 }
 
 /// <summary>
