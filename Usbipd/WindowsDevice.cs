@@ -114,11 +114,38 @@ sealed partial class WindowsDevice : IEquatable<WindowsDevice>
 
     public const string UnknownDescription = "Unknown device";
 
-    /// <returns>An amalgamated "best" description of the device.</returns>
+    /// <summary>
+    /// Appended to the name Device Manager shows for a device on the VBoxUSB driver; never part of <see cref="Description"/>.
+    /// </summary>
+    public const string SharedNameNote = " (shared by usbipd)";
+
+
+    /// <summary>
+    /// The product name the device reports itself (its USB product string), whatever driver it has; <see langword="null"/> if it has none.
+    /// </summary>
+    public string? ProductName => TryGetProperty(Node, PInvoke.DEVPKEY_Device_BusReportedDeviceDesc, out string name)
+        && !string.IsNullOrWhiteSpace(name) ? name.Trim() : null;
+
+    /// <returns>An amalgamated "best" description of the device: always the real product, also while it is shared.</returns>
     public string Description
     {
         get
         {
+            if (HasVBoxDriver)
+            {
+                // The VBoxUSB driver has no names of its own and the device has no child devices then;
+                // the product string is what the device is.
+                if (ProductName is { } productName)
+                {
+                    return productName;
+                }
+                if (TryGetProperty(Node, PInvoke.DEVPKEY_NAME, out string sharedName))
+                {
+                    sharedName = StripSharedNameNote(sharedName.Trim());
+                    return string.IsNullOrEmpty(sharedName) ? UnknownDescription : sharedName;
+                }
+                return UnknownDescription;
+            }
             var isCompositeDevice = TryGetProperty(Node, PInvoke.DEVPKEY_Device_CompatibleIds, out string[] compatibleIds)
                 && compatibleIds.Contains(@"USB\COMPOSITE");
             if (!isCompositeDevice)
@@ -183,12 +210,21 @@ sealed partial class WindowsDevice : IEquatable<WindowsDevice>
         }
     }
 
+    static string StripSharedNameNote(string name)
+    {
+        return name.EndsWith(SharedNameNote, StringComparison.Ordinal) ? name[..^SharedNameNote.Length].TrimEnd() : name;
+    }
+
+    /// <summary>
+    /// The name Device Manager shows for a shared device: the real product, with a note that usbipd shares it.
+    /// </summary>
     /// <returns>true on success.</returns>
     public bool SetFriendlyName()
     {
+        var name = (ProductName ?? UnknownDescription) + SharedNameNote;
         // NOTE: Must include terminating NUL character.
         return PInvoke.CM_Set_DevNode_Property(Node, PInvoke.DEVPKEY_Device_FriendlyName, DEVPROPTYPE.DEVPROP_TYPE_STRING,
-            Encoding.Unicode.GetBytes("USBIP Shared Device\0"), 0) == CONFIGRET.CR_SUCCESS;
+            Encoding.Unicode.GetBytes(name + "\0"), 0) == CONFIGRET.CR_SUCCESS;
     }
 
     [GeneratedRegex(@"^Port_#([0-9]{4}).Hub_#([0-9]{4})$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]

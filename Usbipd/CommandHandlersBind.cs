@@ -63,8 +63,9 @@ sealed partial class CommandHandlers : ICommandHandlers
         }
 
         // The row exists before the device is identified: if the device is removed from here on, the service drops the row
-        // and the confirmation below fails.
-        var guid = existing?.Guid ?? BindStore.Persist(device.InstanceId, device.Description);
+        // and the confirmation below fails. The description is read from the device itself (its real product name).
+        var description = windowsDevice.Description;
+        var guid = BindStore.Persist(device.InstanceId, description);
         DeviceIdentity identity;
         try
         {
@@ -91,7 +92,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             return ExitCode.Failure;
         }
 
-        console.ReportInfo($"Device with busid '{busId}' is shared: {device.Description}");
+        console.ReportInfo($"Device with busid '{busId}' is shared: {description}");
         ReportIdentity(console, identity);
         if (identity.SerialNumber is null)
         {

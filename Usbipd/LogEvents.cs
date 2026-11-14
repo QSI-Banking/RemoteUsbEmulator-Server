@@ -90,7 +90,7 @@ static partial class LogEvents
     [LoggerMessage(27, LogLevel.Warning, "Shared devices cannot be watched or updated in the database: {reason}")]
     public static partial void BindWatchFailed(this ILogger logger, string reason);
 
-    [LoggerMessage(28, LogLevel.Warning, "Client {clientAddress} (user '{userName}'): the device at {busId} is not shared: {reason}")]
+    [LoggerMessage(28, LogLevel.Warning, "Client {clientAddress} (user '{userName}'): the device at {busId} cannot be attached until an administrator acts on the server: {reason}")]
     public static partial void ClientBindInvalid(this ILogger logger, IPAddress clientAddress, string userName, BusId busId, string reason);
 
     [LoggerMessage(1000, LogLevel.Debug, "{text}")]

@@ -188,6 +188,16 @@ static class UserStore
     }
 
     /// <summary>
+    /// Whether the user is mapped to a device on this server (shared or not).
+    /// </summary>
+    public static bool IsMappedOnThisServer(string userName)
+    {
+        var serverName = ServerName;
+        using var db = Open();
+        return db.UserDevices.AsNoTracking().Any(m => m.User!.Name == userName && m.Device!.ServerName == serverName);
+    }
+
+    /// <summary>
     /// For command line completion; empty if the database cannot be reached.
     /// </summary>
     public static List<string> TryGetUserNames()

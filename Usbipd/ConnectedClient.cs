@@ -166,10 +166,18 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
 
         Guid? guid;
         Automation.Device? device;
+        bool isMapped;
+        string? invalidReason = null;
         try
         {
             guid = UserDeviceMap.GetDeviceGuid(userName);
             device = guid.HasValue ? Data.BindStore.GetBoundDevices().SingleOrDefault(d => d.PersistedGuid == guid.Value) : null;
+            // Mapped to a device on this server, whether or not that device is shared right now.
+            isMapped = guid.HasValue || Data.UserStore.IsMappedOnThisServer(userName);
+            if (device is not null && device.BusId.HasValue && !device.BusId.Value.IsIncompatibleHub)
+            {
+                invalidReason = await BindWatcher.GetInvalidReasonAsync(guid!.Value, device.InstanceId);
+            }
         }
         catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))
         {
@@ -178,11 +186,22 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
             await SendOpCodeAsync(OpCode.OP_REP_AUTH, Status.ST_SERVER_UNAVAILABLE);
             return false;
         }
-        if (device is null || !device.BusId.HasValue || device.BusId.Value.IsIncompatibleHub)
+        if (!isMapped)
         {
-            // Not mapped, bind removed, unplugged, or on an incompatible hub.
             Logger.ClientNoDeviceForUser(ClientContext.ClientAddress, userName, guid);
             await SendOpCodeAsync(OpCode.OP_REP_AUTH, Status.ST_NODEV);
+            return false;
+        }
+        if (device is null || !device.BusId.HasValue || device.BusId.Value.IsIncompatibleHub || invalidReason is not null)
+        {
+            // The user has a device on this server, but only an administrator on the server can make it available again:
+            // the bind was dropped (device removed) or removed, it needs a review after a service start, or the device
+            // is not present or not usable.
+            invalidReason ??= device is null ? "the device is not shared (its bind was dropped or removed)"
+                : !device.BusId.HasValue ? "the device is not present"
+                : "the device is on a hub that is not supported";
+            Logger.ClientBindInvalid(ClientContext.ClientAddress, userName, device?.BusId ?? default, invalidReason);
+            await SendOpCodeAsync(OpCode.OP_REP_AUTH, Status.ST_DEV_NEEDS_ADMIN);
             return false;
         }
 
@@ -290,7 +309,7 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
             if (invalidReason is not null)
             {
                 Logger.ClientBindInvalid(ClientContext.ClientAddress, ClientContext.AuthenticatedUser, busId, invalidReason);
-                await SendOpCodeAsync(OpCode.OP_REP_IMPORT, Status.ST_NODEV);
+                await SendOpCodeAsync(OpCode.OP_REP_IMPORT, Status.ST_DEV_NEEDS_ADMIN);
                 return;
             }
 

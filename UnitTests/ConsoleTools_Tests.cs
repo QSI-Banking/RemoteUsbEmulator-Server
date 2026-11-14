@@ -54,6 +54,33 @@ sealed class ConsoleTools_Tests
     }
 
     [TestMethod]
+    public void ReportInfo_Interactive_IsNotAnError()
+    {
+        var console = new TestConsole { IsOutputRedirected = false };
+        ConsoleTools.ReportInfo(console, "test");
+        Assert.Contains("info: test.", console.OutText);
+        Assert.IsTrue(string.IsNullOrEmpty(console.ErrorText));
+    }
+
+    [TestMethod]
+    public void ReportWarning_Interactive_IsNotAnError()
+    {
+        var console = new TestConsole { IsOutputRedirected = false };
+        ConsoleTools.ReportWarning(console, "test");
+        Assert.Contains("warning: test.", console.OutText);
+        Assert.IsTrue(string.IsNullOrEmpty(console.ErrorText));
+    }
+
+    [TestMethod]
+    public void ReportError_Interactive_IsAnError()
+    {
+        var console = new TestConsole { IsOutputRedirected = false };
+        ConsoleTools.ReportError(console, "test");
+        Assert.IsTrue(string.IsNullOrEmpty(console.OutText));
+        Assert.Contains("error: test.", console.ErrorText);
+    }
+
+    [TestMethod]
     public void ReportRebootRequired()
     {
         var console = new TestConsole();

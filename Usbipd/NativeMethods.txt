@@ -51,6 +51,7 @@ DEVPKEY_Device_CompatibleIds
 DEVPKEY_Device_DevNodeStatus
 DEVPKEY_Device_DriverVersion
 DEVPKEY_Device_FriendlyName
+DEVPKEY_Device_BusReportedDeviceDesc
 DEVPKEY_Device_HardwareIds
 DEVPKEY_Device_InstanceId
 DEVPKEY_Device_IsPresent

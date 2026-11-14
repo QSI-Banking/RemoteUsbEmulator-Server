@@ -4,7 +4,6 @@
 
 using System.Runtime.InteropServices;
 using System.Text;
-using Microsoft.Win32;
 using Usbipd.Automation;
 using Windows.Win32;
 using Windows.Win32.Devices.DeviceAndDriverInstallation;
@@ -133,12 +132,23 @@ static partial class ConsoleTools
     }
 
     /// <summary>
-    /// All "console logging" reports go to <see cref="Console.Error"/>, so they can be easily
-    /// separated from expected output, e.g. from 'list', which goes to <see cref="Console.Out"/>.
+    /// Errors go to <see cref="Console.Error"/>. Information and warnings are not failures, so they go to
+    /// <see cref="Console.Out"/>: PowerShell shows anything on the error stream as an error record.
+    /// When the output is redirected (piped or captured, for example 'usbipd state' into a JSON parser),
+    /// they go to <see cref="Console.Error"/> instead, so that the output stays clean data.
     /// </summary>
-    static void ReportText(this IConsole console, string level, string text)
+    static void ReportText(this IConsole console, string level, string text, bool toOutput)
     {
-        console.Error.WriteLine($"{AppDomain.CurrentDomain.FriendlyName}: {level}: {EnforceFinalPeriod(text)}");
+        var writer = toOutput ? console.Out : console.Error;
+        writer.WriteLine($"{AppDomain.CurrentDomain.FriendlyName}: {level}: {EnforceFinalPeriod(text)}");
+    }
+
+    /// <summary>
+    /// Information and warnings: the output, unless that is redirected (see <see cref="ReportText"/>).
+    /// </summary>
+    static bool ReportsToOutput(IConsole console)
+    {
+        return !console.IsOutputRedirected;
     }
 
     sealed partial class TemporaryColor
@@ -146,9 +156,9 @@ static partial class ConsoleTools
     {
         readonly bool NeedReset;
 
-        public TemporaryColor(IConsole console, ConsoleColor color)
+        public TemporaryColor(IConsole console, ConsoleColor color, bool toOutput)
         {
-            if (console.IsErrorRedirected)
+            if (toOutput ? console.IsOutputRedirected : console.IsErrorRedirected)
             {
                 return;
             }
@@ -167,20 +177,22 @@ static partial class ConsoleTools
 
     public static void ReportError(this IConsole console, string text)
     {
-        using var color = new TemporaryColor(console, ConsoleColor.Red);
-        console.ReportText("error", text);
+        using var color = new TemporaryColor(console, ConsoleColor.Red, false);
+        console.ReportText("error", text, false);
     }
 
     public static void ReportWarning(this IConsole console, string text)
     {
-        using var color = new TemporaryColor(console, ConsoleColor.Yellow);
-        console.ReportText("warning", text);
+        var toOutput = ReportsToOutput(console);
+        using var color = new TemporaryColor(console, ConsoleColor.Yellow, toOutput);
+        console.ReportText("warning", text, toOutput);
     }
 
     public static void ReportInfo(this IConsole console, string text)
     {
-        using var color = new TemporaryColor(console, ConsoleColor.DarkGray);
-        console.ReportText("info", text);
+        var toOutput = ReportsToOutput(console);
+        using var color = new TemporaryColor(console, ConsoleColor.DarkGray, toOutput);
+        console.ReportText("info", text, toOutput);
     }
 
     public static void ReportWin32Error(this IConsole console, string function, WIN32_ERROR error)
@@ -249,38 +261,6 @@ static partial class ConsoleTools
             return false;
         }
         return true;
-    }
-
-    static readonly SortedSet<string> WhitelistUpperFilters = [];
-
-    static readonly SortedSet<string> BlacklistUpperFilters =
-    [
-        "EUsbHubFilter",
-        "TsUsbFlt",
-        "UsbDk",
-        "USBPcap",
-    ];
-
-    const string UpperFiltersPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\{36fc9e60-c465-11cf-8056-444553540000}";
-    const string UpperFiltersName = @"UpperFilters";
-
-    /// <summary>
-    /// Helper to warn users that an incompatible USB filter driver has been detected.
-    /// </summary>
-    public static void ReportIfForceNeeded(this IConsole console)
-    {
-        var upperFilters = Registry.GetValue(UpperFiltersPath, UpperFiltersName, null) as string[] ?? [];
-        foreach (var filter in new SortedSet<string>(upperFilters.Where(f => !string.IsNullOrWhiteSpace(f)), StringComparer.InvariantCultureIgnoreCase))
-        {
-            if (BlacklistUpperFilters.Contains(filter, StringComparer.InvariantCultureIgnoreCase))
-            {
-                console.ReportWarning($"USB filter '{filter}' is known to be incompatible with this software; 'bind --force' will be required.");
-            }
-            else if (!WhitelistUpperFilters.Contains(filter, StringComparer.InvariantCultureIgnoreCase))
-            {
-                console.ReportWarning($"Unknown USB filter '{filter}' may be incompatible with this software; 'bind --force' may be required.");
-            }
-        }
     }
 
     public static void ReportRebootRequired(this IConsole console)

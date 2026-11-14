@@ -78,6 +78,12 @@ static class UsbIp
 
         /// <summary>The server cannot check the user right now: its user database is unreachable.</summary>
         ST_SERVER_UNAVAILABLE,
+
+        /// <summary>
+        /// The user's device is bound, but an administrator must act on the server before it can be attached:
+        /// the bind needs a review after a service start, or the device was removed and its bind was dropped.
+        /// </summary>
+        ST_DEV_NEEDS_ADMIN,
     }
 
     internal enum UsbIpCmd : uint

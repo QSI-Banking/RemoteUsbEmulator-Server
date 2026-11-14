@@ -11,7 +11,7 @@ sealed class TestConsole : IConsole
 
     public TextWriter Error { get; private set; } = new StringWriter();
 
-    public bool IsOutputRedirected => true;
+    public bool IsOutputRedirected { get; init; } = true;
 
     public bool IsErrorRedirected => true;
 
