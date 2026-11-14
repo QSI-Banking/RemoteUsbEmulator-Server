@@ -163,7 +163,14 @@ Known limits:
 | Device busy | Another session holds the device | `usbipd detach` if needed |
 | Connection or TLS failure | Certificate not allowed, wrong server name or pin, port blocked | `usbipd client list`; check the client's settings |
 
-The service log explains every refusal. To see it, stop the service and run it in an elevated console:
+The service log explains every refusal. It is in Event Viewer under **Applications and Services Logs > usbipd >
+Operational**, or in PowerShell:
+
+```powershell
+Get-WinEvent -LogName usbipd/Operational -MaxEvents 30 | Format-Table TimeCreated, Id, LevelDisplayName, Message -Wrap
+```
+
+For debug detail as well, stop the service and run it in an elevated console:
 `Stop-Service usbipd; usbipd server` (Ctrl+C, then `Start-Service usbipd`).
 
 ## Configuration reference

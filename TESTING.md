@@ -16,7 +16,8 @@ Run it before a release and after changes to the area a section covers.
   license dongle). A third device of a different kind for the swap tests.
 - **Client**: a second PC or a Hyper-V VM with test signing on, the client installer, a client certificate.
 - **Users**: one test user with its secret enrolled in an authenticator app.
-- To watch the server log: `Stop-Service usbipd; usbipd server` in an elevated console (Ctrl+C, then `Start-Service usbipd`).
+- The server log is in Event Viewer: Applications and Services Logs > usbipd > Operational. For debug detail, run
+  `Stop-Service usbipd; usbipd server` in an elevated console instead (Ctrl+C, then `Start-Service usbipd`).
 - `$usbipd` below is `usbipd.exe` in the install folder; run server commands elevated.
 
 Each test: **steps**, then the **expected** result. A test fails if anything else happens.
