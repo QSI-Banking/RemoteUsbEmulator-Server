@@ -44,7 +44,6 @@ sealed class CommandHandlersCli_Tests
         usbipdKey.SetValue("Version", GitVersionInformation.MajorMinorPatch);
 #pragma warning restore CS0436 // Type conflicts with imported type
         using var devicesKey = usbipdKey.CreateSubKey("Devices");
-        using var policyKey = usbipdKey.CreateSubKey("Policy");
         UsbipdRegistry.TestInstance?.Dispose();
         UsbipdRegistry.TestInstance = new(TestRegistry);
     }
@@ -70,7 +69,7 @@ sealed class CommandHandlersCli_Tests
     {
         try
         {
-            _ = Usbipd.Data.BindStore.GetPolicyRules();
+            _ = Usbipd.Data.BindStore.GetBindInfos();
         }
         catch (Exception ex) when (Usbipd.Data.UserStore.IsDatabaseError(ex))
         {
@@ -127,15 +126,5 @@ sealed class CommandHandlersCli_Tests
         var console = new TestConsole();
 
         await cli.State(console, TestContext.CancellationToken);
-    }
-
-    [TestMethod]
-    public async Task PolicyList()
-    {
-        RequireDatabase();
-        var cli = (ICommandHandlers)new CommandHandlers();
-        var console = new TestConsole();
-
-        await cli.PolicyList(console, TestContext.CancellationToken);
     }
 }

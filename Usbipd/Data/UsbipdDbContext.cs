@@ -22,8 +22,6 @@ sealed class UsbipdDbContext(DbContextOptions<UsbipdDbContext> options) : DbCont
 
     public DbSet<Attachment> Attachments => Set<Attachment>();
 
-    public DbSet<PolicyRuleEntry> PolicyRules => Set<PolicyRuleEntry>();
-
     public DbSet<ClientCertificate> ClientCertificates => Set<ClientCertificate>();
 
     public DbSet<OtpSecret> OtpSecrets => Set<OtpSecret>();
@@ -106,20 +104,6 @@ sealed class UsbipdDbContext(DbContextOptions<UsbipdDbContext> options) : DbCont
             _ = entity.Property(a => a.StubInstanceId).HasMaxLength(400).IsRequired();
             _ = entity.Property(a => a.UserName).HasMaxLength(UserNames.MaxLength).IsRequired();
             _ = entity.Property(a => a.StartedUtc).HasColumnType("datetime2");
-        });
-
-        _ = modelBuilder.Entity<PolicyRuleEntry>(entity =>
-        {
-            _ = entity.ToTable("PolicyRules");
-            _ = entity.Property(p => p.Id).ValueGeneratedNever();
-            _ = entity.Property(p => p.ServerName).HasMaxLength(256).IsRequired();
-            _ = entity.Property(p => p.Effect).HasMaxLength(16).IsRequired();
-            _ = entity.Property(p => p.Operation).HasMaxLength(16).IsRequired();
-            _ = entity.Property(p => p.BusId).HasMaxLength(16);
-            _ = entity.Property(p => p.HardwareId).HasMaxLength(16);
-            _ = entity.HasIndex(p => p.ServerName);
-            _ = entity.Property(p => p.CreatedUtc).HasColumnType("datetime2");
-            _ = entity.Property(p => p.CreatedBy).HasMaxLength(256).IsRequired();
         });
 
         _ = modelBuilder.Entity<OtpSecret>(entity =>

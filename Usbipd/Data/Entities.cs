@@ -198,28 +198,6 @@ sealed class ClientCertificate
 }
 
 /// <summary>
-/// A policy rule ('usbipd policy add') of one server.
-/// </summary>
-sealed class PolicyRuleEntry
-{
-    public Guid Id { get; set; }
-
-    public string ServerName { get; set; } = string.Empty;
-
-    public string Effect { get; set; } = string.Empty;
-
-    public string Operation { get; set; } = string.Empty;
-
-    public string? BusId { get; set; }
-
-    public string? HardwareId { get; set; }
-
-    public DateTime CreatedUtc { get; set; }
-
-    public string CreatedBy { get; set; } = string.Empty;
-}
-
-/// <summary>
 /// The one device a user may attach.
 /// </summary>
 sealed class UserDevice

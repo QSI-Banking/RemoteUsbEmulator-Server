@@ -140,12 +140,6 @@ sealed partial class Server : BackgroundService
             {
                 clientAddress = clientAddress.MapToIPv4();
             }
-            if (clientAddress.Equals(IPAddress.Loopback))
-            {
-                // HACK: workaround for https://github.com/microsoft/WSL/issues/10741
-                Logger.Debug("WSL keep-alive workaround");
-                tcpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, false);
-            }
 
             _ = Task.Run(() => HandleClientAsync(tcpClient, clientAddress, tlsAuthenticator, stoppingToken), stoppingToken);
         }

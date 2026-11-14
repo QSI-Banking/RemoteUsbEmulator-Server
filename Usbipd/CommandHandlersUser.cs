@@ -293,7 +293,8 @@ sealed partial class CommandHandlers : ICommandHandlers
     }
 
     /// <summary>
-    /// One-time move of what earlier versions kept in the registry (HKLM\SOFTWARE\usbipd-win): binds, policy rules and users.
+    /// One-time move of what earlier versions kept in the registry (HKLM\SOFTWARE\usbipd-win): binds and users.
+    /// Policy rules are no longer supported; they are skipped with a note.
     /// Binds keep their GUID. Imported entries are removed from the registry; entries that conflict with the database are kept
     /// (with a warning) and the database is not changed for them.
     /// </summary>
@@ -310,16 +311,20 @@ sealed partial class CommandHandlers : ICommandHandlers
         }
 
         var registryDevices = UsbipdRegistry.Instance.GetBoundDevices().Where(d => d.PersistedGuid.HasValue).ToList();
-        var registryRules = UsbipdRegistry.Instance.GetPolicyRules();
+        var registryRuleCount = UsbipdRegistry.Instance.CountPolicyRules();
+        if (registryRuleCount > 0)
+        {
+            console.ReportWarning($"{registryRuleCount} policy rule(s) in the registry are skipped: policy rules are no longer supported. " +
+                "Share devices with 'usbipd bind' instead.");
+        }
         var registryUsers = UsbipdRegistry.Instance.GetUserDevices();
-        if (registryDevices.Count == 0 && registryRules.Count == 0 && registryUsers.Count == 0)
+        if (registryDevices.Count == 0 && registryUsers.Count == 0)
         {
             console.ReportInfo("There is nothing in the registry to import.");
             return ExitCode.Success;
         }
 
         var importedBinds = new List<Device>();
-        var importedRules = new List<Guid>();
         var importedUsers = new List<string>();
         try
         {
@@ -352,16 +357,6 @@ sealed partial class CommandHandlers : ICommandHandlers
             // Saved before the users, which may refer to these devices.
             _ = await db.SaveChangesAsync(cancellationToken);
 
-            var databaseRules = Data.BindStore.GetPolicyRules();
-            foreach (var (guid, rule) in registryRules)
-            {
-                if (!databaseRules.ContainsValue(rule))
-                {
-                    _ = Data.BindStore.AddPolicyRule(rule);
-                }
-                importedRules.Add(guid);
-            }
-
             foreach (var (userName, deviceGuid) in registryUsers)
             {
                 if (await UserStore.FindUserAsync(db, userName, cancellationToken) is not null)
@@ -393,11 +388,6 @@ sealed partial class CommandHandlers : ICommandHandlers
         {
             UsbipdRegistry.Instance.StopSharingDevice(device.PersistedGuid!.Value);
             console.ReportInfo($"Imported bind '{device.PersistedGuid:D}' ({device.Description}).");
-        }
-        foreach (var guid in importedRules)
-        {
-            UsbipdRegistry.Instance.RemovePolicyRule(guid);
-            console.ReportInfo($"Imported policy rule '{guid:D}'.");
         }
         foreach (var userName in importedUsers)
         {

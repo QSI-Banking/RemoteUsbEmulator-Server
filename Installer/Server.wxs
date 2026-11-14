@@ -75,10 +75,6 @@ SPDX-License-Identifier: GPL-3.0-only
                         Key="Devices"
                         ForceCreateOnInstall="yes"
                     />
-                    <RegistryKey
-                        Key="Policy"
-                        ForceCreateOnInstall="yes"
-                    />
                 </RegistryKey>
                 <Environment
                     Id="PATH"

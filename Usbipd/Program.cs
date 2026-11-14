@@ -9,9 +9,6 @@ using System.CommandLine.Help;
 using System.CommandLine.Invocation;
 using System.CommandLine.Parsing;
 using System.Diagnostics;
-using System.Net;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
 using System.Reflection;
 using Usbipd.Automation;
 
@@ -79,15 +76,6 @@ static class Program
             AddParseError<VidPid>(argumentResult);
         }
         return vidPid;
-    }
-
-    static IPAddress ParseIPAddress(ArgumentResult argumentResult)
-    {
-        if (!IPAddress.TryParse(argumentResult.Tokens[0].Value, out var ipAddress))
-        {
-            AddParseError<IPAddress>(argumentResult);
-        }
-        return ipAddress ?? IPAddress.None;
     }
 
     static string OneOfRequiredText(params Option[] options)
@@ -235,124 +223,10 @@ static class Program
 
     internal static async Task<ExitCode> Run(IConsole console, ICommandHandlers commandHandlers, params string[] args)
     {
-        var rootCommand = new RootCommand("Shares locally connected USB devices to other machines, including Hyper-V guests and WSL 2.");
+        var rootCommand = new RootCommand("Shares locally connected USB devices with authenticated client machines over mutual TLS.");
         {
             var helpOption = rootCommand.Options.Single(option => option is HelpOption);
             helpOption.Action = new CustomHelpAction((HelpAction)helpOption.Action!);
-        }
-        {
-            //
-            //  attach [--auto-attach]
-            //
-            var autoAttachOption = new Option<bool>("--auto-attach", "-a")
-            {
-                Description = "Automatically re-attach when the device is detached or unplugged",
-                Arity = ArgumentArity.Zero,
-            };
-            //
-            //  attach --busid <BUSID>
-            //
-            var busIdOption = new Option<BusId>("--busid", "-b")
-            {
-                Description = "Attach device having <BUSID>",
-                // NOTE: By specifying HelpName, the help text will *not* include the completion hints (which could be empty, or a really long list).
-                HelpName = "BUSID",
-                CustomParser = ParseCompatibleBusId,
-            };
-            busIdOption.CompletionSources.Add(CompatibleBusIdCompletions);
-            //
-            //  attach --wsl [<DISTRIBUTION>]
-            //
-            var wslOption = new Option<string>("--wsl", "-w")
-            {
-                Description = "Attach to WSL, optionally specifying the distribution to use",
-                // NOTE: By specifying HelpName, the help text will *not* include the completion hints (which could be empty, or a really long list).
-                HelpName = "[DISTRIBUTION]",
-                Required = true,
-                Arity = ArgumentArity.ZeroOrOne,
-            };
-            wslOption.CompletionSources.Add(completionContext => CompletionGuard(completionContext, () =>
-                Wsl.CreateAsync(CancellationToken.None).Result?.Select(d => new CompletionItem(d.Name))));
-            //
-            //  attach [--hardware-id <VID>:<PID>]
-            //
-            // NOTE: the alias '-h' is already for '--help'
-            var hardwareIdOption = new Option<VidPid>("--hardware-id", "-i")
-            {
-                Description = "Attach device having <VID>:<PID>",
-                // NOTE: By specifying HelpName, the help text will *not* include the completion hints (which could be empty, or a really long list).
-                HelpName = "VID:PID",
-                CustomParser = ParseVidPid,
-            };
-            hardwareIdOption.CompletionSources.Add(completionContext => CompletionGuard(completionContext, () =>
-                DeviceExtensions.GetAll().Where(d => d.BusId.HasValue).GroupBy(d => d.HardwareId).Select(g => new CompletionItem(g.Key.ToString()))));
-            //
-            //  attach [--host-ip <IPADDRESS>]
-            //
-            // NOTE: the alias '-h' is already for '--help' and '-i' is already for '--hardware-id'.
-            var hostIpOption = new Option<IPAddress>("--host-ip", "-o")
-            {
-                Description = "Use <IPADDRESS> for WSL to connect back to the host",
-                // NOTE: By specifying HelpName, the help text will *not* include the completion hints (which could be empty, or a really long list).
-                HelpName = "IPADDRESS",
-                CustomParser = ParseIPAddress,
-            };
-            hostIpOption.CompletionSources.Add(completionContext => CompletionGuard(completionContext, () =>
-                // Get all non-loopback unicast IPv4 addresses.
-                NetworkInterface.GetAllNetworkInterfaces()
-                    .Where(ni => ni.OperationalStatus == OperationalStatus.Up)
-                    .Select(ni => ni.GetIPProperties().UnicastAddresses)
-                    .SelectMany(uac => uac)
-                    .Where(ua => ua.Address.AddressFamily == AddressFamily.InterNetwork)
-                    .Where(ua => ua.Address.GetAddressBytes()[0] != 127)
-                    .Select(ua => ua.Address.ToString())
-                    .Order()
-                    .Distinct()
-                    .Select(ip => new CompletionItem(ip))));
-            //
-            //  attach [--unplugged]
-            //
-            var unpluggedOption = new Option<bool>("--unplugged", "-u")
-            {
-                Description = "Allows auto-attaching a currently unplugged device",
-                Arity = ArgumentArity.Zero,
-            };
-            //
-            //  attach
-            //
-            var attachCommand = new Command("attach", "Attach a USB device to a client\0" + $"""
-                Attaches a USB device to a client.
-
-                Currently, only WSL is supported. Other clients need to perform an attach using client-side tooling.
-
-                {OneOfRequiredText(busIdOption, hardwareIdOption)}
-                {OptionRequiresText(unpluggedOption, autoAttachOption, busIdOption)}
-                """)
-                {
-                    autoAttachOption,
-                    busIdOption,
-                    hardwareIdOption,
-                    wslOption,
-                    hostIpOption,
-                    unpluggedOption,
-                };
-            attachCommand.Validators.Add(commandResult => ValidateOneOf(commandResult, busIdOption, hardwareIdOption));
-            attachCommand.Validators.Add(commandResult => ValidateOptionRequires(commandResult, unpluggedOption, autoAttachOption, busIdOption));
-            attachCommand.SetAction(async (parseResult, cancellationToken) => (int)(
-                parseResult.GetResult(busIdOption) is not null
-                    ? await commandHandlers.AttachWsl(parseResult.GetRequiredValue(busIdOption),
-                            parseResult.GetValue(autoAttachOption),
-                            parseResult.GetValue(unpluggedOption),
-                            parseResult.GetValue(wslOption),
-                            parseResult.GetValue(hostIpOption),
-                            console, cancellationToken)
-                    : await commandHandlers.AttachWsl(parseResult.GetRequiredValue(hardwareIdOption),
-                            parseResult.GetValue(autoAttachOption),
-                            parseResult.GetValue(wslOption),
-                            parseResult.GetValue(hostIpOption),
-                            console, cancellationToken)
-            ));
-            rootCommand.Subcommands.Add(attachCommand);
         }
         {
             //
@@ -534,141 +408,6 @@ static class Program
                 await commandHandlers.List(parseResult.GetValue(usbidsOption), parseResult.GetValue(connectedOption), console, cancellationToken)
             );
             rootCommand.Subcommands.Add(listCommand);
-        }
-        {
-            //
-            //  policy
-            //
-            var policyCommand = new Command("policy", "Manage policy rules\0" +
-                "Policy rules allow or deny specific operations.");
-            {
-                //
-                //  policy add --effect <EFFECT>
-                //
-                var effectOption = new Option<PolicyRuleEffect>("--effect", "-e")
-                {
-                    Description = "Allow or Deny",
-                    // NOTE: This gets an automatic completion list because of the Enum type.
-                    // HelpName = "EFFECT",
-                    Required = true,
-                };
-                //
-                //  policy add --operation <OPERATION>
-                //
-                var operationOption = new Option<PolicyRuleOperation>("--operation", "-o")
-                {
-                    Description = "Currently only supports 'AutoBind'",
-                    // NOTE: This gets an automatic completion list because of the Enum type.
-                    // HelpName = "OPERATION",
-                    Required = true,
-                };
-                //
-                //  policy add [--busid <BUSID>]
-                //
-                var busIdOption = new Option<BusId>("--busid", "-b")
-                {
-                    Description = "Add a policy for device having <BUSID>",
-                    // NOTE: By specifying HelpName, the help text will *not* include the completion hints (which could be empty, or a really long list).
-                    HelpName = "BUSID",
-                    CustomParser = ParseCompatibleBusId,
-                };
-                busIdOption.CompletionSources.Add(CompatibleBusIdCompletions);
-                //
-                //  policy add [--hardware-id <VID>:<PID>]
-                //
-                // NOTE: the alias '-h' is already for '--help'
-                var hardwareIdOption = new Option<VidPid>("--hardware-id", "-i")
-                {
-                    Description = "Add a policy for device having <VID>:<PID>",
-                    // NOTE: By specifying HelpName, the help text will *not* include the completion hints (which could be empty, or a really long list).
-                    HelpName = "VID:PID",
-                    CustomParser = ParseVidPid,
-                };
-                hardwareIdOption.CompletionSources.Add(completionContext => CompletionGuard(completionContext, () =>
-                    DeviceExtensions.GetAll().GroupBy(d => d.HardwareId).Select(g => new CompletionItem(g.Key.ToString()))));
-                //
-                //  policy add
-                //
-                var addCommand = new Command("add", "Add a policy rule\0" + $"""
-                    Add a new policy rule. The resulting policy will be effective immediately.
-
-                    {AtLeastOneOfRequiredText(busIdOption, hardwareIdOption)}
-                    """)
-                {
-                    effectOption,
-                    operationOption,
-                    busIdOption,
-                    hardwareIdOption,
-                };
-                addCommand.Validators.Add(commandResult => ValidateAtLeastOneOf(commandResult, busIdOption, hardwareIdOption));
-                addCommand.SetAction(async (parseResult, cancellationToken) =>
-                {
-                    var operation = parseResult.GetRequiredValue(operationOption);
-                    return (int)await (operation switch
-                    {
-                        PolicyRuleOperation.AutoBind =>
-                            commandHandlers.PolicyAdd(new PolicyRuleAutoBind(parseResult.GetRequiredValue(effectOption),
-                                    parseResult.GetResult(busIdOption)?.GetRequiredValue(busIdOption),
-                                    parseResult.GetResult(hardwareIdOption)?.GetRequiredValue(hardwareIdOption)),
-                                console, cancellationToken),
-                        _ => throw new UnexpectedResultException($"Unexpected policy rule operation '{operation}'."),
-                    });
-                });
-                policyCommand.Subcommands.Add(addCommand);
-            }
-            {
-                //
-                //  policy list
-                //
-                var listCommand = new Command("list", "List policy rules\0" +
-                    "List all policy rules.");
-                listCommand.SetAction(async (parseResult, cancellationToken) => (int)
-                    await commandHandlers.PolicyList(console, cancellationToken)
-                );
-                policyCommand.Subcommands.Add(listCommand);
-            }
-            {
-                //
-                //  policy remove [--all]
-                //
-                var allOption = new Option<bool>("--all", "-a")
-                {
-                    Description = "Remove all policy rules",
-                    Arity = ArgumentArity.Zero,
-                };
-                //
-                //  policy remove [--guid <GUID>]
-                //
-                var guidOption = new Option<Guid>("--guid", "-g")
-                {
-                    Description = "Remove the policy rule having <GUID>",
-                    // NOTE: By specifying HelpName, the help text will *not* include the completion hints (which could be empty, or a really long list).
-                    HelpName = "GUID",
-                    CustomParser = ParseGuid,
-                };
-                guidOption.CompletionSources.Add(completionContext => CompletionGuard(completionContext, () =>
-                    Data.BindStore.GetPolicyRules().Select(r => new CompletionItem(r.Key.ToString("D")))));
-                //
-                //  policy remove
-                //
-                var removeCommand = new Command("remove", "Remove a policy rule\0" + $"""
-                    Remove existing policy rules. The resulting policy will be effective immediately.
-
-                    {OneOfRequiredText(allOption, guidOption)}
-                    """)
-                {
-                    allOption,
-                    guidOption,
-                };
-                removeCommand.Validators.Add(commandResult => ValidateOneOf(commandResult, allOption, guidOption));
-                removeCommand.SetAction(async (parseResult, cancellationToken) => (int)(
-                    parseResult.GetValue(allOption)
-                        ? await commandHandlers.PolicyRemoveAll(console, cancellationToken)
-                        : await commandHandlers.PolicyRemove(parseResult.GetRequiredValue(guidOption), console, cancellationToken)
-                ));
-                policyCommand.Subcommands.Add(removeCommand);
-            }
-            rootCommand.Subcommands.Add(policyCommand);
         }
         {
             //
@@ -1074,33 +813,6 @@ static class Program
         }
         {
             //
-            //  wsl
-            //
-            //  NOTE: This command is obsolete; we just need to inform the user where to find the changes.
-            //
-            var wslCommand = new Command("wsl")
-            {
-                Hidden = true,
-            };
-            wslCommand.Options.Add(new Option<bool>("--help", "-h", "-?")
-            {
-                Arity = ArgumentArity.Zero,
-            });
-            wslCommand.Arguments.Add(new Argument<string[]>("ANY")
-            {
-                Arity = ArgumentArity.ZeroOrMore,
-            });
-            wslCommand.SetAction(async (parseResult, cancellationToken) =>
-            {
-                // System.CommandLine requires *all* actions to be either asynchronous or synchronous.
-                await Task.CompletedTask;
-                console.ReportError($"The 'wsl' subcommand has been removed. Learn about the new syntax at {Wsl.AttachWslUrl}.");
-                return (int)ExitCode.ParseError;
-            });
-            rootCommand.Subcommands.Add(wslCommand);
-        }
-        {
-            //
             //  db migrate
             //
             var dbCommand = new Command("db", "Manage the database\0" +
@@ -1115,7 +827,7 @@ static class Program
             //  db import-registry
             //
             var importCommand = new Command("import-registry", "Move registry settings to the database\0" +
-                "One-time move of the binds, policy rules and users that earlier versions kept in the registry into the database. " +
+                "One-time move of the binds and users that earlier versions kept in the registry into the database (policy rules are no longer supported and are skipped). " +
                 "Imported entries are removed from the registry; entries that conflict with the database are kept.");
             importCommand.SetAction(async (parseResult, cancellationToken) => (int)
                 await commandHandlers.ImportRegistry(console, cancellationToken));
@@ -1228,7 +940,7 @@ static class Program
         catch (Exception ex) when (ex is Data.DatabaseConfigurationException or Microsoft.Data.SqlClient.SqlException
             or Microsoft.EntityFrameworkCore.DbUpdateException)
         {
-            // Binds, policy rules, attachments and users are in SQL Server.
+            // Binds, attachments, users and client certificates are in SQL Server.
             console.ReportError($"Database: {ex.Message}");
             return ExitCode.Failure;
         }

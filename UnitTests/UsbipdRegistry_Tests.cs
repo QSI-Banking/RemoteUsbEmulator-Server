@@ -44,7 +44,6 @@ sealed class UsbipdRegistry_Tests
         usbipdKey.SetValue("Version", GitVersionInformation.MajorMinorPatch);
 #pragma warning restore CS0436 // Type conflicts with imported type
         using var devicesKey = usbipdKey.CreateSubKey("Devices");
-        using var policyKey = usbipdKey.CreateSubKey("Policy");
         UsbipdRegistry.TestInstance?.Dispose();
         UsbipdRegistry.TestInstance = new(TestRegistry);
     }
@@ -173,99 +172,19 @@ sealed class UsbipdRegistry_Tests
     }
 
     [TestMethod]
-    public void AddPolicyRule()
+    public void CountPolicyRules()
     {
-        var testRule = new PolicyRuleAutoBind(PolicyRuleEffect.Allow, new(1, 2), new(0x1111, 0x2222));
-
-        UsbipdRegistry.Instance.AddPolicyRule(testRule);
-
-        Assert.HasCount(1, UsbipdRegistry.Instance.GetPolicyRules());
-    }
-
-    [TestMethod]
-    public void AddPolicyRule_Invalid()
-    {
-        var invalidRule = new PolicyRuleAutoBind(PolicyRuleEffect.Allow, null, null);
-
-        Assert.ThrowsExactly<ArgumentException>(() =>
+        // Policy rules are no longer supported; earlier versions' rules are only counted for 'usbipd db import-registry'.
+        Assert.AreEqual(0, UsbipdRegistry.Instance.CountPolicyRules());
+        using (var usbipdKey = TestRegistry.OpenSubKey(@"SOFTWARE\usbipd-win", true)!)
+        using (var policyKey = usbipdKey.CreateSubKey("Policy"))
         {
-            UsbipdRegistry.Instance.AddPolicyRule(invalidRule);
-        });
-        Assert.HasCount(0, UsbipdRegistry.Instance.GetPolicyRules());
-    }
-
-    [TestMethod]
-    public void AddPolicyRule_Duplicate()
-    {
-        var testRule = new PolicyRuleAutoBind(PolicyRuleEffect.Allow, new(1, 2), new(0x1111, 0x2222));
-
-        UsbipdRegistry.Instance.AddPolicyRule(testRule);
-
-        Assert.ThrowsExactly<ArgumentException>(() =>
-        {
-            UsbipdRegistry.Instance.AddPolicyRule(testRule);
-        });
-        Assert.HasCount(1, UsbipdRegistry.Instance.GetPolicyRules());
-    }
-
-    [TestMethod]
-    public void RemovePolicyRule()
-    {
-        var testRule1 = new PolicyRuleAutoBind(PolicyRuleEffect.Allow, new(1, 1), new(0x1111, 0x1111));
-        var testRule2 = new PolicyRuleAutoBind(PolicyRuleEffect.Allow, new(2, 2), new(0x2222, 0x2222));
-
-        UsbipdRegistry.Instance.AddPolicyRule(testRule1);
-        UsbipdRegistry.Instance.AddPolicyRule(testRule2);
-        Assert.HasCount(2, UsbipdRegistry.Instance.GetPolicyRules());
-
-        var rules = UsbipdRegistry.Instance.GetPolicyRules();
-
-        UsbipdRegistry.Instance.RemovePolicyRule(rules.First().Key);
-
-        Assert.HasCount(1, UsbipdRegistry.Instance.GetPolicyRules());
-        Assert.DoesNotContain(d => d.Key == rules.First().Key, UsbipdRegistry.Instance.GetPolicyRules());
-    }
-
-    [TestMethod]
-    public void RemovePolicyRule_NonExistent()
-    {
-        var testRule1 = new PolicyRuleAutoBind(PolicyRuleEffect.Allow, new(1, 1), new(0x1111, 0x1111));
-        var testRule2 = new PolicyRuleAutoBind(PolicyRuleEffect.Allow, new(2, 2), new(0x2222, 0x2222));
-
-        UsbipdRegistry.Instance.AddPolicyRule(testRule1);
-        UsbipdRegistry.Instance.AddPolicyRule(testRule2);
-        Assert.HasCount(2, UsbipdRegistry.Instance.GetPolicyRules());
-
-        var bogusGuid = Guid.Parse("12345678-0000-4000-0000-000000000000");
-        UsbipdRegistry.Instance.RemovePolicyRule(bogusGuid);
-
-        Assert.HasCount(2, UsbipdRegistry.Instance.GetPolicyRules());
-    }
-
-    [TestMethod]
-    public void RemovePolicyRule_All()
-    {
-        var testRule1 = new PolicyRuleAutoBind(PolicyRuleEffect.Allow, new(1, 1), new(0x1111, 0x1111));
-        var testRule2 = new PolicyRuleAutoBind(PolicyRuleEffect.Allow, new(2, 2), new(0x2222, 0x2222));
-
-        UsbipdRegistry.Instance.AddPolicyRule(testRule1);
-        UsbipdRegistry.Instance.AddPolicyRule(testRule2);
-        Assert.HasCount(2, UsbipdRegistry.Instance.GetPolicyRules());
-
-        UsbipdRegistry.Instance.RemovePolicyRuleAll();
-
-        Assert.HasCount(0, UsbipdRegistry.Instance.GetPolicyRules());
-    }
-
-    [TestMethod]
-    public void GetPolicyRules_NotInstalled()
-    {
-        SetUninstalled();
-
-        Assert.ThrowsExactly<UnexpectedResultException>(() =>
-        {
-            _ = UsbipdRegistry.Instance.GetPolicyRules();
-        });
+            policyKey.CreateSubKey(Guid.NewGuid().ToString("B")).Dispose();
+            policyKey.CreateSubKey(Guid.NewGuid().ToString("B")).Dispose();
+        }
+        UsbipdRegistry.TestInstance?.Dispose();
+        UsbipdRegistry.TestInstance = new(TestRegistry);
+        Assert.AreEqual(2, UsbipdRegistry.Instance.CountPolicyRules());
     }
 
     static readonly Guid TestDeviceGuid = Guid.Parse("{B60EDA76-B612-4337-8270-FB97E53F8376}");

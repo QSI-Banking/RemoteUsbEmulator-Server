@@ -4,7 +4,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.Diagnostics;
-using System.Net;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Usbipd.Automation;
@@ -140,7 +139,7 @@ sealed partial class CommandHandlers : ICommandHandlers
                     ? (!device.IsForced ? "Needs bind (driver lost)" : validBinds.Contains(guid) ? "Shared" : "Needs review")
                 : device.BusId.Value.IsIncompatibleHub ? "Incompatible hub"
                 : device.IsForced ? "Quarantined"
-                : Policy.IsAutoBindAllowed(device) ? "Allowed" : "Not shared";
+                : "Not shared";
             needsReview |= state is "Needs review" or "Needs bind (driver lost)" or "Quarantined";
             console.Out.Write($"{(device.BusId.Value.IsIncompatibleHub ? string.Empty : device.BusId.Value),-5}  ");
             console.Out.Write($"{device.HardwareId,-9}  ");
@@ -353,52 +352,6 @@ sealed partial class CommandHandlers : ICommandHandlers
         return Task.FromResult(ExitCode.Success);
     }
 
-    async Task<ExitCode> ICommandHandlers.AttachWsl(BusId busId, bool autoAttach, bool unplugged, string? distribution, IPAddress? hostAddress,
-        IConsole console, CancellationToken cancellationToken)
-    {
-        if (!CheckInstalled(console))
-        {
-            return ExitCode.Failure;
-        }
-
-        var device = DeviceExtensions.GetAll().SingleOrDefault(d => d.BusId.HasValue && d.BusId.Value == busId);
-        if (device is null)
-        {
-            if (!autoAttach || !unplugged)
-            {
-                console.ReportError($"There is no device with busid '{busId}'.");
-                return ExitCode.Failure;
-            }
-            // user requested auto-attach, even if a device is currently not plugged in
-        }
-        else
-        {
-            if (!device.PersistedGuid.HasValue && !Policy.IsAutoBindAllowed(device))
-            {
-                console.ReportError($"Device is not shared; run 'usbipd bind --busid {busId}' as administrator first.");
-                return ExitCode.Failure;
-            }
-            // We allow auto-attach on devices that are already attached.
-            if (!autoAttach && (device.ClientIPAddress is not null))
-            {
-                console.ReportError($"Device with busid '{busId}' is already attached to a client.");
-                return ExitCode.Failure;
-            }
-        }
-
-        return console.CheckAndReportServerRunning(true)
-            ? await Wsl.Attach(busId, autoAttach, distribution, hostAddress, console, cancellationToken)
-            : ExitCode.Failure;
-    }
-
-    async Task<ExitCode> ICommandHandlers.AttachWsl(VidPid vidPid, bool autoAttach, string? distribution, IPAddress? hostAddress,
-        IConsole console, CancellationToken cancellationToken)
-    {
-        return GetBusIdByHardwareId(vidPid, console) is BusId busId
-            ? await ((ICommandHandlers)this).AttachWsl(busId, autoAttach, false, distribution, hostAddress, console, cancellationToken)
-            : ExitCode.Failure;
-    }
-
     static ExitCode Detach(IEnumerable<Device> devices, IConsole console)
     {
         if (!CheckInstalled(console))
@@ -518,99 +471,5 @@ sealed partial class CommandHandlers : ICommandHandlers
 
         await console.Out.WriteAsync(json);
         return ExitCode.Success;
-    }
-
-    Task<ExitCode> ICommandHandlers.PolicyAdd(PolicyRule rule, IConsole console, CancellationToken cancellationToken)
-    {
-        if (!CheckInstalled(console))
-        {
-            return Task.FromResult(ExitCode.Failure);
-        }
-
-        if (Data.BindStore.GetPolicyRules().FirstOrDefault(r => r.Value == rule) is var existingRule && existingRule.Key != default)
-        {
-            console.ReportError($"Policy rule already exists with guid '{existingRule.Key:D}'.");
-            return Task.FromResult(ExitCode.Failure);
-        }
-
-        if (!CheckWriteAccess(console))
-        {
-            return Task.FromResult(ExitCode.AccessDenied);
-        }
-
-        var guid = Data.BindStore.AddPolicyRule(rule);
-        console.ReportInfo($"Policy rule created with guid '{guid:D}'.");
-        return Task.FromResult(ExitCode.Success);
-    }
-
-    Task<ExitCode> ICommandHandlers.PolicyList(IConsole console, CancellationToken cancellationToken)
-    {
-        if (!CheckInstalled(console))
-        {
-            return Task.FromResult(ExitCode.Failure);
-        }
-
-#pragma warning disable CA1849 // Call async methods when in an async method
-        var policyRules = Data.BindStore.GetPolicyRules();
-        console.Out.WriteLine("Policy rules:");
-        console.Out.WriteLine($"{"GUID",-36}  {"EFFECT",-6}  {"OPERATION",-9}  {"BUSID",-5}  {"VID:PID",-9}");
-        foreach (var rule in policyRules)
-        {
-            console.Out.Write($"{rule.Key,-36}  ");
-            console.Out.Write($"{rule.Value.Effect,-6}  ");
-            console.Out.Write($"{rule.Value.Operation,-9}  ");
-            switch (rule.Value.Operation)
-            {
-                case PolicyRuleOperation.AutoBind:
-                    var autoBind = (PolicyRuleAutoBind)rule.Value;
-                    console.Out.Write($"{(autoBind.BusId.HasValue ? autoBind.BusId.Value : string.Empty),-5}  ");
-                    console.Out.Write($"{(autoBind.HardwareId.HasValue ? autoBind.HardwareId.Value : string.Empty),-9}");
-                    break;
-                default:
-                    throw new UnexpectedResultException();
-            }
-            console.Out.WriteLine();
-        }
-        console.Out.WriteLine();
-        return Task.FromResult(ExitCode.Success);
-#pragma warning restore CA1849 // Call async methods when in an async method
-    }
-
-    Task<ExitCode> ICommandHandlers.PolicyRemove(Guid guid, IConsole console, CancellationToken cancellationToken)
-    {
-        if (!CheckInstalled(console))
-        {
-            return Task.FromResult(ExitCode.Failure);
-        }
-
-        if (!Data.BindStore.GetPolicyRules().ContainsKey(guid))
-        {
-            console.ReportError($"There is no policy rule with guid '{guid:D}'.");
-            return Task.FromResult(ExitCode.Failure);
-        }
-
-        if (!CheckWriteAccess(console))
-        {
-            return Task.FromResult(ExitCode.AccessDenied);
-        }
-
-        Data.BindStore.RemovePolicyRule(guid);
-        return Task.FromResult(ExitCode.Success);
-    }
-
-    Task<ExitCode> ICommandHandlers.PolicyRemoveAll(IConsole console, CancellationToken cancellationToken)
-    {
-        if (!CheckInstalled(console))
-        {
-            return Task.FromResult(ExitCode.Failure);
-        }
-
-        if (!CheckWriteAccess(console))
-        {
-            return Task.FromResult(ExitCode.AccessDenied);
-        }
-
-        Data.BindStore.RemovePolicyRuleAll();
-        return Task.FromResult(ExitCode.Success);
     }
 }

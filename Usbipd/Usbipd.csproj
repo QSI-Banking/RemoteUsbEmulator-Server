@@ -110,17 +110,6 @@ SPDX-License-Identifier: GPL-3.0-only
   </Target>
 
   <ItemGroup>
-    <!-- WSL -->
-    <!-- Copy everything at the top level only, except the REUSE .license files (if any). -->
-    <None Remove="WSL\**\*" />
-    <Content Include="WSL\*" CopyToOutputDirectory="PreserveNewest" />
-    <Content Remove="WSL\*.license" />
-    <!-- Also copy everything in the platform directory moving it to the top level, except the REUSE .license files (if any). -->
-    <Content Include="WSL\$(Platform)\*" Link="WSL\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <Content Remove="WSL\$(Platform)\*.license" />
-  </ItemGroup>
-
-  <ItemGroup>
     <!-- Drivers -->
     <!-- Copy everything at the top level only, except the REUSE .license files (if any). -->
     <Content Include="..\Drivers\*" Link="Drivers\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />

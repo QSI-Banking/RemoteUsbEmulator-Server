@@ -10,7 +10,7 @@ using AutomationDevice = Usbipd.Automation.Device;
 namespace Usbipd.Data;
 
 /// <summary>
-/// Binds (shared devices), attachments and policy rules of this server, in SQL Server.
+/// Binds (shared devices) and attachments of this server, in SQL Server.
 /// <para>
 /// All methods throw on database errors (see <see cref="UserStore.IsDatabaseError"/>); callers decide whether that is fatal.
 /// </para>
@@ -303,99 +303,5 @@ static class BindStore
             device.Description = description;
         }
         return device;
-    }
-
-    public static Guid AddPolicyRule(PolicyRule rule)
-    {
-        if (!rule.IsValid())
-        {
-            throw new ArgumentException("Invalid policy rule", nameof(rule));
-        }
-        if (GetPolicyRules().ContainsValue(rule))
-        {
-            throw new ArgumentException("Duplicate policy rule", nameof(rule));
-        }
-        var entry = new PolicyRuleEntry
-        {
-            Id = Guid.NewGuid(),
-            ServerName = UserStore.ServerName,
-            Effect = rule.Effect.ToString(),
-            Operation = rule.Operation.ToString(),
-            CreatedUtc = DateTime.UtcNow,
-            CreatedBy = UserStore.CurrentAccount,
-        };
-        switch (rule)
-        {
-            case PolicyRuleAutoBind autoBind:
-                entry.BusId = autoBind.BusId?.ToString();
-                entry.HardwareId = autoBind.HardwareId?.ToString();
-                break;
-            default:
-                throw new ArgumentException("Unsupported policy rule", nameof(rule));
-        }
-        using var db = UserStore.Open();
-        _ = db.PolicyRules.Add(entry);
-        UserStore.Audit(db, "policy add", $"{entry.Id:B} {rule}");
-        _ = db.SaveChanges();
-        return entry.Id;
-    }
-
-    public static void RemovePolicyRule(Guid guid)
-    {
-        var serverName = UserStore.ServerName;
-        using var db = UserStore.Open();
-        if (db.PolicyRules.Where(p => p.Id == guid && p.ServerName == serverName).ExecuteDelete() > 0)
-        {
-            UserStore.Audit(db, "policy remove", $"{guid:B}");
-            _ = db.SaveChanges();
-        }
-    }
-
-    public static void RemovePolicyRuleAll()
-    {
-        var serverName = UserStore.ServerName;
-        using var db = UserStore.Open();
-        var count = db.PolicyRules.Where(p => p.ServerName == serverName).ExecuteDelete();
-        UserStore.Audit(db, "policy remove --all", $"{count} rule(s)");
-        _ = db.SaveChanges();
-    }
-
-    /// <summary>
-    /// The policy rules of this server; invalid rules and duplicates are ignored.
-    /// </summary>
-    public static SortedDictionary<Guid, PolicyRule> GetPolicyRules()
-    {
-        var serverName = UserStore.ServerName;
-        List<PolicyRuleEntry> entries;
-        using (var db = UserStore.Open())
-        {
-            entries = [.. db.PolicyRules.AsNoTracking().Where(p => p.ServerName == serverName)];
-        }
-        var rules = new SortedDictionary<Guid, PolicyRule>();
-        foreach (var entry in entries.OrderBy(e => e.Id))
-        {
-            if (!Enum.TryParse<PolicyRuleEffect>(entry.Effect, true, out var effect)
-                || !Enum.TryParse<PolicyRuleOperation>(entry.Operation, true, out var operation))
-            {
-                continue;
-            }
-            PolicyRule rule;
-            switch (operation)
-            {
-                case PolicyRuleOperation.AutoBind:
-                    BusId? busId = BusId.TryParse(entry.BusId ?? string.Empty, out var parsedBusId) ? parsedBusId : null;
-                    VidPid? hardwareId = VidPid.TryParse(entry.HardwareId ?? string.Empty, out var parsedHardwareId) ? parsedHardwareId : null;
-                    rule = new PolicyRuleAutoBind(effect, busId, hardwareId);
-                    break;
-                default:
-                    continue;
-            }
-            if (!rule.IsValid() || rules.ContainsValue(rule))
-            {
-                continue;
-            }
-            rules.Add(entry.Id, rule);
-        }
-        return rules;
     }
 }

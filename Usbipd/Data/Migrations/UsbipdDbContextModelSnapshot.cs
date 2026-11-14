@@ -256,49 +256,6 @@ namespace Usbipd.Data.Migrations
                     b.ToTable("OtpSecrets", "usbipd");
                 });
 
-            modelBuilder.Entity("Usbipd.Data.PolicyRuleEntry", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("BusId")
-                        .HasMaxLength(16)
-                        .HasColumnType("nvarchar(16)");
-
-                    b.Property<string>("CreatedBy")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<DateTime>("CreatedUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Effect")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("nvarchar(16)");
-
-                    b.Property<string>("HardwareId")
-                        .HasMaxLength(16)
-                        .HasColumnType("nvarchar(16)");
-
-                    b.Property<string>("Operation")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("nvarchar(16)");
-
-                    b.Property<string>("ServerName")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ServerName");
-
-                    b.ToTable("PolicyRules", "usbipd");
-                });
-
             modelBuilder.Entity("Usbipd.Data.ServerRun", b =>
                 {
                     b.Property<string>("ServerName")

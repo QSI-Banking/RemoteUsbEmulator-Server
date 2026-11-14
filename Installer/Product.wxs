@@ -130,16 +130,6 @@ SPDX-License-Identifier: GPL-3.0-only
                 <ComponentGroupRef Id="Drivers" />
             </Feature>
             <Feature
-                Id="WSL"
-                Level="1"
-                AllowAdvertise="no"
-                AllowAbsent="yes"
-                Title="WSL Support"
-                Description="Support files to attach devices to WSL."
-                >
-                <ComponentGroupRef Id="WSL" />
-            </Feature>
-            <Feature
                 Id="PowerShell"
                 Level="1"
                 AllowAdvertise="no"

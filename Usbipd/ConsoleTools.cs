@@ -221,7 +221,7 @@ static partial class ConsoleTools
     /// </para>
     ///
     /// <para>
-    /// For example, 'attach --wsl' will not work at all.
+    /// For example, 'bind --review' cannot work without the service.
     /// Therefore, such commands will give an error and the current action fails.
     /// </para>
     /// </summary>
