@@ -1,5 +1,5 @@
 <!--
-SPDX-FileCopyrightText: 2026 QSI-Banking
+SPDX-FileCopyrightText: 2026 QSI Banking
 
 SPDX-License-Identifier: GPL-3.0-only
 -->
@@ -98,7 +98,7 @@ Each test: **steps**, then the **expected** result. A test fails if anything els
 | 6.1 | While attached: `Restart-Service usbipd` on the server | Client device disappears and does not come back |
 | 6.2 | While attached: disconnect the client's network for a minute, reconnect | Device does not come back |
 | 6.3 | Reboot the client | No device attached after the reboot |
-| 6.4 | `usbip port --stash` | Not an option |
+| 6.4 | `qsiusb port --stash` | Not an option |
 
 ## 7. Administration
 

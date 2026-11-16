@@ -1,6 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
 SPDX-FileCopyrightText: 2021 Frans van Dorsselaer
+SPDX-FileCopyrightText: 2026 QSI Banking
 
 SPDX-License-Identifier: GPL-3.0-only
 -->
@@ -54,7 +55,7 @@ SPDX-License-Identifier: GPL-3.0-only
 
     <!-- Assembly metadata -->
     <Product>usbipd-win</Product>
-    <Company>Frans van Dorsselaer</Company>
+    <Company>QSI, Inc</Company>
   </PropertyGroup>
 
   <!-- Required for Dependabot -->
@@ -72,7 +73,7 @@ SPDX-License-Identifier: GPL-3.0-only
       <!-- For deterministic builds, use the commit year as the copyright year. -->
       <CopyrightYear Condition="$(ContinuousIntegrationBuild)">$([System.DateTime]::Parse($(GitVersion_CommitDate)).ToString("yyyy"))</CopyrightYear>
       <CopyrightYear Condition="!$(ContinuousIntegrationBuild)">$([System.DateTime]::UtcNow.ToString("yyyy"))</CopyrightYear>
-      <Copyright>Copyright (C) $(CopyrightYear)  $(Company)</Copyright>
+      <Copyright>Copyright (C) 2020-$(CopyrightYear) Frans van Dorsselaer; modifications (C) 2026 QSI Banking</Copyright>
     </PropertyGroup>
   </Target>
 

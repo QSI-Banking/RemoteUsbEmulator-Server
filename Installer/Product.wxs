@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 SPDX-FileCopyrightText: 2020 Frans van Dorsselaer
+SPDX-FileCopyrightText: 2026 QSI Banking
 
 SPDX-License-Identifier: GPL-3.0-only
 -->
@@ -14,7 +15,7 @@ SPDX-License-Identifier: GPL-3.0-only
         Language="1033"
         Codepage="0"
         Version="$(var.GitVersion_MajorMinorPatch)"
-        Manufacturer="Frans van Dorsselaer"
+        Manufacturer="QSI, Inc"
         UpgradeCode="{EA1D5623-E6A7-4E4A-9259-E3972226646F}"
         UpgradeStrategy="majorUpgrade"
         InstallerVersion="500"

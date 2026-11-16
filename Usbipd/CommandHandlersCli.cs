@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2022 Frans van Dorsselaer
 // SPDX-FileCopyrightText: Microsoft Corporation
+// SPDX-FileCopyrightText: 2026 QSI Banking
 //
 // SPDX-License-Identifier: GPL-3.0-only
 
