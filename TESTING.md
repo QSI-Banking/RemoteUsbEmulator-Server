@@ -87,7 +87,7 @@ Each test: **steps**, then the **expected** result. A test fails if anything els
 | 5.10 | Stop the service; swap the serial-less device for a different device in the same port; start; `bind --review` | Refused: descriptors differ |
 | 5.11 | Same with a device of the same model in the same port | Refused: unplugged and plugged in again since it was bound |
 | 5.12 | `bind --review --yes` with one matching and one missing device | The matching one confirmed, the missing one refused; non-zero exit code |
-| 5.13 | Bound device in an error state (Device Manager shows a problem); unplug it, plug it back in; attach | Refused: unplugged and plugged in again; bind dropped; `list` no longer shows it shared |
+| 5.13 | Simulate a replug the service did not see: `UPDATE usbipd.Binds SET ArrivedUtc = DATEADD(second, -30, ArrivedUtc)` for the bound device; attach | Refused: unplugged and plugged in again; bind dropped; `list` no longer shows it shared. (Same path as a device in an error state that is replugged: its driver is not running, so no removal event is seen) |
 | 5.14 | Attach, detach, attach again without touching the device | Both attaches work |
 | 5.15 | Stop the service; unplug and replug the same device; start; `bind --review` | Refused: unplugged and plugged in again since it was bound |
 

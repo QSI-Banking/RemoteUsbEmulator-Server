@@ -171,6 +171,13 @@ sealed partial class CommandHandlers : ICommandHandlers
         if (pending.Count == 0)
         {
             console.ReportInfo("No shared device needs a review.");
+            // A quarantined device has no bind, so there is nothing to review; say what it needs instead.
+            foreach (var quarantined in DeviceExtensions.GetAll()
+                .Where(d => d.BusId.HasValue && !d.BusId.Value.IsIncompatibleHub && d.PersistedGuid is null && d.IsForced))
+            {
+                console.ReportWarning($"The device with busid '{quarantined.BusId}' is quarantined (its bind was dropped); " +
+                    $"it is not shared. Use 'usbipd bind --busid {quarantined.BusId}' to share it again, or 'usbipd unbind --busid {quarantined.BusId}' to release it.");
+            }
             return ExitCode.Success;
         }
         if (!yes && Console.IsInputRedirected)
