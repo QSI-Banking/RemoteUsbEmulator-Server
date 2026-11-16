@@ -108,6 +108,12 @@ static partial class LogEvents
     [LoggerMessage(33, LogLevel.Warning, "Client {clientAddress}: {count} wrong one-time passwords for user '{userName}' within a minute; the bind of device {instanceId} is dropped. Bind the device again to share it.")]
     public static partial void WrongCodeLimitReached(this ILogger logger, IPAddress clientAddress, int count, string userName, string instanceId);
 
+    [LoggerMessage(34, LogLevel.Warning, "Client {clientAddress} did not sign in within {seconds} seconds after the TLS handshake; the connection is closed.")]
+    public static partial void ClientSignInTimeout(this ILogger logger, IPAddress clientAddress, int seconds);
+
+    [LoggerMessage(35, LogLevel.Warning, "The limit of {limit} client connections is reached; new connections are refused until one closes.")]
+    public static partial void ConnectionLimitReached(this ILogger logger, int limit);
+
     [LoggerMessage(1000, LogLevel.Debug, "{text}")]
     public static partial void Debug(this ILogger logger, string text);
 

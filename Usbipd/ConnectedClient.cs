@@ -24,6 +24,11 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
     WrongCodeLimiter wrongCodeLimiter)
 {
     readonly WrongCodeLimiter WrongCodeLimiter = wrongCodeLimiter;
+
+    /// <summary>
+    /// How long a refused sign-in takes, at least.
+    /// </summary>
+    static readonly TimeSpan FailedSignInDuration = TimeSpan.FromSeconds(1);
     readonly BindWatcher BindWatcher = bindWatcher;
     readonly ILogger Logger = logger;
     readonly ClientContext ClientContext = clientContext;
@@ -37,7 +42,20 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
     {
         try
         {
-            var opCode = await ReceiveOpCodeAsync(cancellationToken);
+            // The sign-in must be complete within ImportTimeout after the TLS handshake:
+            // a connection with a valid certificate cannot be held open without signing in.
+            using var signInDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            signInDeadline.CancelAfter(SessionRegistry.Settings.ImportTimeout);
+            OpCode opCode;
+            try
+            {
+                opCode = await ReceiveOpCodeAsync(signInDeadline.Token);
+            }
+            catch (OperationCanceledException) when (signInDeadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+            {
+                Logger.ClientSignInTimeout(ClientContext.ClientAddress, (int)SessionRegistry.Settings.ImportTimeout.TotalSeconds);
+                return;
+            }
             if (Logger.IsEnabled(LogLevel.Debug))
             {
                 Logger.Debug($"Received opcode: {opCode}");
@@ -46,8 +64,16 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
             {
                 case OpCode.OP_REQ_AUTH:
                     // Authenticate, then exactly one OP_REQ_IMPORT for the user's device.
-                    if (!await HandleRequestAuthAsync(cancellationToken))
+                    try
                     {
+                        if (!await HandleRequestAuthAsync(signInDeadline.Token))
+                        {
+                            return;
+                        }
+                    }
+                    catch (OperationCanceledException) when (signInDeadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                    {
+                        Logger.ClientSignInTimeout(ClientContext.ClientAddress, (int)SessionRegistry.Settings.ImportTimeout.TotalSeconds);
                         return;
                     }
                     // The import must follow within ImportTimeout; an authenticated connection cannot be held open.
@@ -143,6 +169,7 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
     {
         var userName = await ReceiveLengthPrefixedStringAsync(USBIP_MAX_USER, cancellationToken);
         var otp = await ReceiveLengthPrefixedStringAsync(USBIP_MAX_OTP, cancellationToken);
+        var checkStarted = Stopwatch.GetTimestamp();
 
         // Never log the one-time password; log the user name only if it is well-formed.
         var authenticated = false;
@@ -165,6 +192,13 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
             if (userName is not null && UserNames.IsValid(userName))
             {
                 DropBindOnTooManyWrongCodes(userName);
+            }
+            // Every refusal takes the same time, whether the user is unknown or the code is wrong,
+            // so the time taken does not tell which user names exist.
+            var remaining = FailedSignInDuration - Stopwatch.GetElapsedTime(checkStarted);
+            if (remaining > TimeSpan.Zero)
+            {
+                await Task.Delay(remaining, cancellationToken);
             }
             await SendOpCodeAsync(OpCode.OP_REP_AUTH, Status.ST_AUTH_FAILED);
             return false;

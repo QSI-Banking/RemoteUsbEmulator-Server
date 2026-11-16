@@ -141,9 +141,42 @@ sealed partial class Server : BackgroundService
                 clientAddress = clientAddress.MapToIPv4();
             }
 
-            _ = Task.Run(() => HandleClientAsync(tcpClient, clientAddress, tlsAuthenticator, stoppingToken), stoppingToken);
+            // Every connection, attached or not, counts; above the limit a new connection is closed at once.
+            if (Interlocked.Increment(ref ConnectionCount) > MaxConnections)
+            {
+                _ = Interlocked.Decrement(ref ConnectionCount);
+                tcpClient.Dispose();
+                if (!ConnectionLimitLogged)
+                {
+                    // Once, until a connection is accepted again: a flood must not fill the log.
+                    ConnectionLimitLogged = true;
+                    Logger.ConnectionLimitReached(MaxConnections);
+                }
+                continue;
+            }
+            ConnectionLimitLogged = false;
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await HandleClientAsync(tcpClient, clientAddress, tlsAuthenticator, stoppingToken);
+                }
+                finally
+                {
+                    _ = Interlocked.Decrement(ref ConnectionCount);
+                    tcpClient.Dispose();
+                }
+            }, CancellationToken.None);
         }
     }
+
+    /// <summary>
+    /// Connections at the same time, in any state. Each attached device uses one for as long as it is attached.
+    /// </summary>
+    const int MaxConnections = 100;
+    int ConnectionCount;
+    bool ConnectionLimitLogged;
 
     async Task HandleClientAsync(TcpClient tcpClient, IPAddress clientAddress, TlsServerAuthenticator tlsAuthenticator,
         CancellationToken stoppingToken)

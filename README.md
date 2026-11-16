@@ -158,6 +158,8 @@ Device states in `usbipd list`:
   AES-256-GCM, key wrapped with the certificate's RSA key) to the TLS server certificate, or to
   `usbipd:Otp:CertificateThumbprint`. Administrators encrypt with the public key; only the
   service, which has the private key, can decrypt. Each secret only decrypts for its own user.
+- **Connections**: at most 100 at a time; one that does not sign in within `ImportTimeoutSeconds` is closed. A refused
+  sign-in always takes one second, whether the user is unknown or the code is wrong.
 - **Wrong codes**: three wrong one-time codes for a user within a minute drop the bind of that user's device (and end
   its session). No more codes can be tried until an administrator runs `usbipd bind` for the device again.
 - **No attaches** while the database cannot be reached.
@@ -205,7 +207,7 @@ For debug detail as well, stop the service and run it in an elevated console:
 | `usbipd:Otp:Issuer` | QSI USB/IP | Name shown in authenticator apps |
 | `usbipd:Otp:CertificateThumbprint` | TLS server certificate | RSA certificate in Local Computer > Personal that OTP secrets are encrypted to |
 | `usbipd:Session:MaxDurationMinutes` | 10 | Hard limit per attach |
-| `usbipd:Session:ImportTimeoutSeconds` | 10 | Time between sign-in and import |
+| `usbipd:Session:ImportTimeoutSeconds` | 10 | Time allowed for the sign-in after the TLS handshake, and again between sign-in and import |
 | `usbipd:Session:RecheckIntervalSeconds` | 2 | How often active sessions are re-checked |
 
 ## Building from source

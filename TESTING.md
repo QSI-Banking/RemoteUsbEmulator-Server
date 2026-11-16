@@ -127,6 +127,29 @@ Each test: **steps**, then the **expected** result. A test fails if anything els
 | 8.9 | Attach with a wrong code three times within a minute | Third attempt: log "3 wrong one-time passwords ... the bind is dropped"; `list` shows the device Quarantined; a correct code then gets "cannot be attached until an administrator checks it"; `bind` shares it again |
 | 8.10 | Two wrong codes, wait more than a minute, one wrong code, then a correct code | Still shared; the correct code attaches |
 | 8.11 | While user A is attached, give three wrong codes for user A from another client | A's session ends and the bind is dropped |
+| 8.12 | Connect with a valid client certificate and send nothing (script below 8.14) | Closed after 10 s; log: did not sign in within 10 seconds |
+| 8.13 | Attach as a user that does not exist, then as a real user with a wrong code; time both | Both refused after about one second, with the same message |
+| 8.14 | Open 101 connections that stay idle (script below) within 10 s | The 101st is closed at once; log once: limit of 100 connections; attaches work again after the idle ones time out |
+| 8.15 | Client driver time-out: on the server run a listener that accepts and stays silent (`$l = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Any, 3299); $l.Start(); $c = $l.AcceptTcpClient()`), point a client at port 3299, attach | The attach fails after about 30 s with a time-out; before this fix it hung |
+| 8.16 | Attach normally, leave the device idle for 2 minutes, use it | Still attached and working (the time-out only applies during attach) |
+
+
+For 8.12 and 8.14, in an elevated PowerShell on a client PC (uses its client certificate):
+
+```powershell
+$server = '<server name>'; $port = 3241
+$cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object Thumbprint -eq '<client certificate thumbprint>'
+function Open-Idle {
+    $tcp = [Net.Sockets.TcpClient]::new($server, $port)
+    $ssl = [Net.Security.SslStream]::new($tcp.GetStream(), $false, { $true })
+    $ssl.AuthenticateAsClient($server, [Security.Cryptography.X509Certificates.X509CertificateCollection]::new(@($cert)), $false)
+    $ssl
+}
+# 8.12: prints about 10 seconds
+$sw = [Diagnostics.Stopwatch]::StartNew(); $s = Open-Idle; try { [void]$s.ReadByte() } catch { }; $sw.Elapsed
+# 8.14: the last one is refused
+$all = 1..101 | ForEach-Object { try { Open-Idle } catch { "refused: $_" } }; $all | Where-Object { $_ -is [string] }
+```
 
 ## 9. Console output
 
