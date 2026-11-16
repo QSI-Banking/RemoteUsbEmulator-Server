@@ -105,6 +105,9 @@ static partial class LogEvents
     [LoggerMessage(28, LogLevel.Warning, "Client {clientAddress} (user '{userName}'): the device at {busId} cannot be attached until an administrator acts on the server: {reason}")]
     public static partial void ClientBindInvalid(this ILogger logger, IPAddress clientAddress, string userName, BusId busId, string reason);
 
+    [LoggerMessage(33, LogLevel.Warning, "Client {clientAddress}: {count} wrong one-time passwords for user '{userName}' within a minute; the bind of device {instanceId} is dropped. Bind the device again to share it.")]
+    public static partial void WrongCodeLimitReached(this ILogger logger, IPAddress clientAddress, int count, string userName, string instanceId);
+
     [LoggerMessage(1000, LogLevel.Debug, "{text}")]
     public static partial void Debug(this ILogger logger, string text);
 

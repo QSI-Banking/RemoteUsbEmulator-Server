@@ -63,6 +63,7 @@ sealed partial class CommandHandlers : ICommandHandlers
                 .AddSingleton<IUserDeviceMap, SqlUserDeviceMap>()
                 .AddSingleton<IClientAllowList, SqlClientAllowList>()
                 .AddSingleton<SessionRegistry>()
+                .AddSingleton<WrongCodeLimiter>()
                 .AddHostedService<SessionMonitor>()
                 .AddHostedService<OtpSecretRotation>()
                 .AddSingleton<BindWatcher>()

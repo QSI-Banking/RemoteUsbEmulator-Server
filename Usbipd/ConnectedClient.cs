@@ -20,8 +20,10 @@ using static Usbipd.Interop.UsbIp;
 namespace Usbipd;
 
 sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clientContext, IServiceProvider serviceProvider,
-    IUserAuthenticator userAuthenticator, IUserDeviceMap userDeviceMap, SessionRegistry sessionRegistry, BindWatcher bindWatcher)
+    IUserAuthenticator userAuthenticator, IUserDeviceMap userDeviceMap, SessionRegistry sessionRegistry, BindWatcher bindWatcher,
+    WrongCodeLimiter wrongCodeLimiter)
 {
+    readonly WrongCodeLimiter WrongCodeLimiter = wrongCodeLimiter;
     readonly BindWatcher BindWatcher = bindWatcher;
     readonly ILogger Logger = logger;
     readonly ClientContext ClientContext = clientContext;
@@ -160,6 +162,10 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
         if (!authenticated || userName is null)
         {
             Logger.ClientAuthenticationFailed(ClientContext.ClientAddress, UserNames.IsValid(userName) ? userName : "<invalid>");
+            if (userName is not null && UserNames.IsValid(userName))
+            {
+                DropBindOnTooManyWrongCodes(userName);
+            }
             await SendOpCodeAsync(OpCode.OP_REP_AUTH, Status.ST_AUTH_FAILED);
             return false;
         }
@@ -214,6 +220,30 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
         _ = Encoding.UTF8.GetBytes(device.BusId.Value.ToString(), buf);
         await Stream.WriteAsync(buf, cancellationToken);
         return true;
+    }
+
+    /// <summary>
+    /// Too many wrong one-time passwords for a user drop the bind of the user's device: no more codes can be tried,
+    /// and an administrator has to bind the device again.
+    /// </summary>
+    void DropBindOnTooManyWrongCodes(string userName)
+    {
+        try
+        {
+            // Only users with a shared device on this server are counted.
+            if (UserDeviceMap.GetDeviceGuid(userName) is not Guid guid
+                || Data.BindStore.GetBindInfos().SingleOrDefault(b => b.Guid == guid) is not { } bind
+                || !WrongCodeLimiter.RecordWrongCode(userName))
+            {
+                return;
+            }
+            Logger.WrongCodeLimitReached(ClientContext.ClientAddress, WrongCodeLimiter.Limit, userName, bind.InstanceId);
+            BindWatcher.DropBind(bind.InstanceId);
+        }
+        catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))
+        {
+            Logger.UserDatabaseUnavailable(ClientContext.ClientAddress, userName, ex.Message);
+        }
     }
 
     async Task HandleRequestImportAsync(byte[] requestedBusId, CancellationToken cancellationToken)

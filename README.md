@@ -158,6 +158,8 @@ Device states in `usbipd list`:
   AES-256-GCM, key wrapped with the certificate's RSA key) to the TLS server certificate, or to
   `usbipd:Otp:CertificateThumbprint`. Administrators encrypt with the public key; only the
   service, which has the private key, can decrypt. Each secret only decrypts for its own user.
+- **Wrong codes**: three wrong one-time codes for a user within a minute drop the bind of that user's device (and end
+  its session). No more codes can be tried until an administrator runs `usbipd bind` for the device again.
 - **No attaches** while the database cannot be reached.
 
 Known limits:

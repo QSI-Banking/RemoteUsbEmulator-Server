@@ -165,9 +165,10 @@ sealed class BindWatcher(SessionRegistry sessionRegistry, ILogger<BindWatcher> l
     }
 
     /// <summary>
-    /// As a removal event: invalid from now on, dropped from the database by <see cref="ExecuteAsync"/>.
+    /// As a removal event: invalid from now on, dropped from the database by <see cref="ExecuteAsync"/>
+    /// (which also ends a session on the device). Also used when too many wrong one-time passwords were tried.
     /// </summary>
-    void DropBind(string instanceId)
+    public void DropBind(string instanceId)
     {
         PendingDrops[BindStore.GetInterfaceKey(instanceId)] = true;
         // Wakes up ExecuteAsync; an empty path is not a device and is skipped.

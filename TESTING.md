@@ -124,6 +124,9 @@ Each test: **steps**, then the **expected** result. A test fails if anything els
 | 8.6 | Copy one user's `ProtectedSecret` into another user's row; sign in as that user | Refused; log: the secret cannot be decrypted |
 | 8.7 | Rotation: install a second RSA certificate, set `usbipd:Otp:CertificateThumbprint` to it, restart; `user otp status` | After the restart all secrets on the new certificate; old one "unused (can be removed)"; codes keep working |
 | 8.8 | Set the thumbprint to a certificate the service has no private key for, restart, sign in | Sign-in fails; log says the private key is not usable |
+| 8.9 | Attach with a wrong code three times within a minute | Third attempt: log "3 wrong one-time passwords ... the bind is dropped"; `list` shows the device Quarantined; a correct code then gets "cannot be attached until an administrator checks it"; `bind` shares it again |
+| 8.10 | Two wrong codes, wait more than a minute, one wrong code, then a correct code | Still shared; the correct code attaches |
+| 8.11 | While user A is attached, give three wrong codes for user A from another client | A's session ends and the bind is dropped |
 
 ## 9. Console output
 
