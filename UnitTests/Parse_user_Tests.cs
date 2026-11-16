@@ -158,4 +158,13 @@ sealed class Parse_user_Tests
     {
         Test(ExitCode.ParseError, "user", "otp");
     }
+
+    [TestMethod]
+    public void OtpStatus_Success()
+    {
+        var mock = CreateMock();
+        mock.Setup(m => m.UserOtpStatus(It.IsNotNull<IConsole>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult(ExitCode.Success));
+
+        Test(ExitCode.Success, mock, "user", "otp", "status");
+    }
 }

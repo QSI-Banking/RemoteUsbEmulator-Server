@@ -19,7 +19,9 @@ namespace Usbipd;
 /// <item>Every start of the service is a new run (<see cref="RunId"/>); binds confirmed in an earlier run need a review.</item>
 /// <item>Windows reports every removal of a shared device (unplugged, moved, disabled, driver changed) as an event,
 /// so a quick swap is not missed; the bind is dropped at once and its session ends.</item>
-/// <item>Before every import the device is compared with what was recorded (<see cref="GetInvalidReasonAsync"/>).</item>
+/// <item>Before every import the device is compared with what was recorded (<see cref="GetInvalidReasonAsync"/>),
+/// including when Windows last saw it plugged in: a replug that raised no event (a device in an error state has no
+/// running driver to stop) is caught there, and the bind is dropped.</item>
 /// </list>
 /// Nothing is ever shared again automatically: a dropped bind needs a new 'usbipd bind' by an administrator.
 /// </summary>
@@ -147,12 +149,29 @@ sealed class BindWatcher(SessionRegistry sessionRegistry, ILogger<BindWatcher> l
         try
         {
             var identity = await DeviceIdentity.ReadAsync(device);
-            return identity.GetMismatch(bind.Fingerprint, bind.LocationPath);
+            if (identity.GetMismatch(bind.Fingerprint, bind.LocationPath, bind.ArrivedUtc) is { } mismatch)
+            {
+                // Unplugged and plugged in again (in any state, also unseen while its driver was not running), moved or
+                // replaced: the same as a removal, the bind is dropped.
+                DropBind(instanceId);
+                return $"{mismatch}; its bind is dropped";
+            }
+            return null;
         }
         catch (InvalidOperationException ex) when (ex is not DatabaseConfigurationException)
         {
             return ex.Message;
         }
+    }
+
+    /// <summary>
+    /// As a removal event: invalid from now on, dropped from the database by <see cref="ExecuteAsync"/>.
+    /// </summary>
+    void DropBind(string instanceId)
+    {
+        PendingDrops[BindStore.GetInterfaceKey(instanceId)] = true;
+        // Wakes up ExecuteAsync; an empty path is not a device and is skipped.
+        _ = RemovedInterfaces.Writer.TryWrite(string.Empty);
     }
 
     /// <summary>

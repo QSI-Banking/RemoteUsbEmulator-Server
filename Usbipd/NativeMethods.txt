@@ -55,6 +55,7 @@ DEVPKEY_Device_BusReportedDeviceDesc
 DEVPKEY_Device_HardwareIds
 DEVPKEY_Device_InstanceId
 DEVPKEY_Device_IsPresent
+DEVPKEY_Device_LastArrivalDate
 DEVPKEY_Device_LocationInfo
 DEVPKEY_Device_LocationPaths
 DEVPKEY_Device_Capabilities

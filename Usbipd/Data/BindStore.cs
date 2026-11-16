@@ -95,7 +95,7 @@ static class BindStore
     /// What was recorded for a bind, and whether it is confirmed for a run of the service.
     /// </summary>
     internal sealed record BindInfo(Guid Guid, string InstanceId, string Description, string? Fingerprint, string? LocationPath,
-        string? HardwareId, string? SerialNumber, string? Interfaces, Guid? ConfirmedRunId);
+        string? HardwareId, string? SerialNumber, string? Interfaces, DateTime? ArrivedUtc, Guid? ConfirmedRunId);
 
     /// <summary>
     /// The binds of this server.
@@ -107,7 +107,7 @@ static class BindStore
         return [.. db.Binds.AsNoTracking()
             .Where(b => b.Device!.ServerName == serverName)
             .Select(b => new BindInfo(b.Id, b.Device!.InstanceId, b.Device.Description, b.Fingerprint, b.LocationPath,
-                b.HardwareId, b.SerialNumber, b.Interfaces, b.ConfirmedRunId))];
+                b.HardwareId, b.SerialNumber, b.Interfaces, b.ArrivedUtc, b.ConfirmedRunId))];
     }
 
     /// <summary>
@@ -157,6 +157,7 @@ static class BindStore
                 .SetProperty(b => b.HardwareId, identity.HardwareId)
                 .SetProperty(b => b.SerialNumber, identity.SerialNumber)
                 .SetProperty(b => b.Interfaces, identity.Interfaces)
+                .SetProperty(b => b.ArrivedUtc, identity.ArrivedUtc)
                 .SetProperty(b => b.ConfirmedRunId, runId)
                 .SetProperty(b => b.ConfirmedUtc, now)
                 .SetProperty(b => b.ConfirmedBy, account));

@@ -80,6 +80,7 @@ sealed class UsbipdDbContext(DbContextOptions<UsbipdDbContext> options) : DbCont
             _ = entity.Property(b => b.HardwareId).HasMaxLength(9).IsUnicode(false);
             _ = entity.Property(b => b.SerialNumber).HasMaxLength(200);
             _ = entity.Property(b => b.Interfaces).HasMaxLength(400);
+            _ = entity.Property(b => b.ArrivedUtc).HasColumnType("datetime2");
             _ = entity.Property(b => b.ConfirmedUtc).HasColumnType("datetime2");
             _ = entity.Property(b => b.ConfirmedBy).HasMaxLength(256);
         });
@@ -112,7 +113,8 @@ sealed class UsbipdDbContext(DbContextOptions<UsbipdDbContext> options) : DbCont
             _ = entity.HasKey(o => o.UserId);
             _ = entity.HasOne(o => o.User).WithOne(u => u.OtpSecret).HasForeignKey<OtpSecret>(o => o.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
-            _ = entity.Property(o => o.Secret).HasMaxLength(64).IsRequired();
+            _ = entity.Property(o => o.ProtectedSecret).HasMaxLength(4000).IsUnicode(false).IsRequired();
+            _ = entity.Property(o => o.CertificateThumbprint).HasMaxLength(40).IsFixedLength().IsUnicode(false).IsRequired();
             _ = entity.Property(o => o.CreatedUtc).HasColumnType("datetime2");
             _ = entity.Property(o => o.CreatedBy).HasMaxLength(256).IsRequired();
         });

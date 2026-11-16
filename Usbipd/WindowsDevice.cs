@@ -276,6 +276,21 @@ sealed partial class WindowsDevice : IEquatable<WindowsDevice>
         ? paths[0] : null;
 
     /// <summary>
+    /// When Windows last saw the device arrive (plugged in, or started again by a driver install); <see langword="null"/>
+    /// if Windows does not report it. It does not change on attach or detach.
+    /// </summary>
+    public DateTime? LastArrivalUtc
+    {
+        get
+        {
+            const int FileTimeLength = 8;
+            return TryGetProperty(Node, PInvoke.DEVPKEY_Device_LastArrivalDate, out byte[] buffer, out var propertyType)
+                && propertyType == DEVPROPTYPE.DEVPROP_TYPE_FILETIME && buffer.Length == FileTimeLength
+                ? DateTime.FromFileTimeUtc(MemoryMarshal.Read<long>(buffer)) : null;
+        }
+    }
+
+    /// <summary>
     /// true if the device is using the VBoxUSB driver (i.e., either a stub device, or a forced-bound device).
     /// </summary>
     public bool HasVBoxDriver => TryGetProperty(Node, PInvoke.DEVPKEY_Device_MatchingDeviceId, out string matchingDeviceId)

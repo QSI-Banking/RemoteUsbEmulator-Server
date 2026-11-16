@@ -90,6 +90,18 @@ static partial class LogEvents
     [LoggerMessage(27, LogLevel.Warning, "Shared devices cannot be watched or updated in the database: {reason}")]
     public static partial void BindWatchFailed(this ILogger logger, string reason);
 
+    [LoggerMessage(29, LogLevel.Warning, "The one-time password secret of user '{userName}' cannot be decrypted: {reason}. The user needs 'usbipd user otp reset'.")]
+    public static partial void OtpSecretUnreadable(this ILogger logger, string userName, string reason);
+
+    [LoggerMessage(30, LogLevel.Information, "The one-time password secret of user id {userId} was re-encrypted from certificate {oldThumbprint} to {newThumbprint}.")]
+    public static partial void OtpSecretRotated(this ILogger logger, int userId, string oldThumbprint, string newThumbprint);
+
+    [LoggerMessage(31, LogLevel.Warning, "The one-time password secret of user id {userId} (certificate {thumbprint}) was not re-encrypted: {reason}")]
+    public static partial void OtpSecretNotRotated(this ILogger logger, int userId, string thumbprint, string reason);
+
+    [LoggerMessage(32, LogLevel.Warning, "One-time password secrets cannot be re-encrypted now: {reason}")]
+    public static partial void OtpRotationFailed(this ILogger logger, string reason);
+
     [LoggerMessage(28, LogLevel.Warning, "Client {clientAddress} (user '{userName}'): the device at {busId} cannot be attached until an administrator acts on the server: {reason}")]
     public static partial void ClientBindInvalid(this ILogger logger, IPAddress clientAddress, string userName, BusId busId, string reason);
 

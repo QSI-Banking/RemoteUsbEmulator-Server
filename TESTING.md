@@ -85,8 +85,11 @@ Each test: **steps**, then the **expected** result. A test fails if anything els
 | 5.8 | `$usbipd bind --review`, confirm | Shared; attach works |
 | 5.9 | Reboot the server | Same as 5.7 and 5.8 |
 | 5.10 | Stop the service; swap the serial-less device for a different device in the same port; start; `bind --review` | Refused: descriptors differ |
-| 5.11 | Same with a device of the same model in the same port | Confirmed only if its descriptors are identical; record the result (known limit) |
+| 5.11 | Same with a device of the same model in the same port | Refused: unplugged and plugged in again since it was bound |
 | 5.12 | `bind --review --yes` with one matching and one missing device | The matching one confirmed, the missing one refused; non-zero exit code |
+| 5.13 | Bound device in an error state (Device Manager shows a problem); unplug it, plug it back in; attach | Refused: unplugged and plugged in again; bind dropped; `list` no longer shows it shared |
+| 5.14 | Attach, detach, attach again without touching the device | Both attaches work |
+| 5.15 | Stop the service; unplug and replug the same device; start; `bind --review` | Refused: unplugged and plugged in again since it was bound |
 
 ## 6. Client: no automatic reconnect
 
@@ -117,6 +120,10 @@ Each test: **steps**, then the **expected** result. A test fails if anything els
 | 8.2 | After Enter | Secret gone from the window and the scrollback |
 | 8.3 | Small window | QR code and text on separate screens, or a request to enlarge the window; never cut off |
 | 8.4 | `... user otp reset --name <user> > out.txt` | Refused before anything changes; the old secret still works |
+| 8.5 | `SELECT ProtectedSecret, CertificateThumbprint FROM usbipd.OtpSecrets` | Values start with `enc:`; thumbprint of the configured certificate |
+| 8.6 | Copy one user's `ProtectedSecret` into another user's row; sign in as that user | Refused; log: the secret cannot be decrypted |
+| 8.7 | Rotation: install a second RSA certificate, set `usbipd:Otp:CertificateThumbprint` to it, restart; `user otp status` | After the restart all secrets on the new certificate; old one "unused (can be removed)"; codes keep working |
+| 8.8 | Set the thumbprint to a certificate the service has no private key for, restart, sign in | Sign-in fails; log says the private key is not usable |
 
 ## 9. Console output
 

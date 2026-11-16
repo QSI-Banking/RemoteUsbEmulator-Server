@@ -99,6 +99,9 @@ namespace Usbipd.Data.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("ArrivedUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("ConfirmedBy")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
@@ -235,6 +238,13 @@ namespace Usbipd.Data.Migrations
                     b.Property<int>("UserId")
                         .HasColumnType("int");
 
+                    b.Property<string>("CertificateThumbprint")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .IsUnicode(false)
+                        .HasColumnType("char(40)")
+                        .IsFixedLength();
+
                     b.Property<string>("CreatedBy")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -246,10 +256,11 @@ namespace Usbipd.Data.Migrations
                     b.Property<long>("LastAcceptedStep")
                         .HasColumnType("bigint");
 
-                    b.Property<byte[]>("Secret")
+                    b.Property<string>("ProtectedSecret")
                         .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("varbinary(64)");
+                        .HasMaxLength(4000)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(4000)");
 
                     b.HasKey("UserId");
 

@@ -9,6 +9,7 @@ sealed class BindWatch_Tests
 {
     const string Fingerprint = "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
     const string Location = "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(2)";
+    static readonly DateTime Arrived = new(2026, 11, 16, 18, 0, 0, DateTimeKind.Utc);
 
     [TestMethod]
     public void InterfaceKey_FromRemovalEvent_MatchesInstanceId()
@@ -34,31 +35,46 @@ sealed class BindWatch_Tests
     [TestMethod]
     public void Identity_Match()
     {
-        var identity = new DeviceIdentity(Fingerprint, Location, "046d:082d", "A5BA06AF", "0e Video");
-        Assert.IsNull(identity.GetMismatch(Fingerprint.ToLowerInvariant(), Location));
+        var identity = new DeviceIdentity(Fingerprint, Location, "046d:082d", "A5BA06AF", "0e Video", Arrived);
+        Assert.IsNull(identity.GetMismatch(Fingerprint.ToLowerInvariant(), Location, Arrived));
     }
 
     [TestMethod]
     public void Identity_OtherPort()
     {
-        var identity = new DeviceIdentity(Fingerprint, Location, "046d:082d", null, "0e Video");
+        var identity = new DeviceIdentity(Fingerprint, Location, "046d:082d", null, "0e Video", Arrived);
         Assert.AreEqual("the device is in another port than when it was bound",
-            identity.GetMismatch(Fingerprint, "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(3)"));
+            identity.GetMismatch(Fingerprint, "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(3)", Arrived));
     }
 
     [TestMethod]
     public void Identity_OtherDevice()
     {
-        var identity = new DeviceIdentity(Fingerprint, Location, "046d:082d", null, "03 HID (keyboard, mouse, ...)");
+        var identity = new DeviceIdentity(Fingerprint, Location, "046d:082d", null, "03 HID (keyboard, mouse, ...)", Arrived);
         Assert.AreEqual("the device is not the one that was bound (its USB descriptors differ)",
-            identity.GetMismatch(new string('F', 64), Location));
+            identity.GetMismatch(new string('F', 64), Location, Arrived));
     }
 
     [TestMethod]
     public void Identity_NothingRecorded()
     {
-        var identity = new DeviceIdentity(Fingerprint, Location, "046d:082d", null, "0e Video");
-        Assert.AreEqual("no identity was recorded for the bind", identity.GetMismatch(null, null));
+        var identity = new DeviceIdentity(Fingerprint, Location, "046d:082d", null, "0e Video", Arrived);
+        Assert.AreEqual("no identity was recorded for the bind", identity.GetMismatch(null, null, null));
+    }
+
+    [TestMethod]
+    public void Identity_Replugged()
+    {
+        var identity = new DeviceIdentity(Fingerprint, Location, "046d:082d", null, "0e Video", Arrived);
+        Assert.AreEqual("the device was unplugged and plugged in again since it was bound",
+            identity.GetMismatch(Fingerprint, Location, Arrived.AddSeconds(-30)));
+    }
+
+    [TestMethod]
+    public void Identity_NoArrivalRecorded()
+    {
+        var identity = new DeviceIdentity(Fingerprint, Location, "046d:082d", null, "0e Video", Arrived);
+        Assert.AreEqual("no plug-in time was recorded for the bind; bind it again", identity.GetMismatch(Fingerprint, Location, null));
     }
 
     [TestMethod]

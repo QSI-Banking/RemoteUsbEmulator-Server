@@ -29,12 +29,15 @@ sealed class Parse_admin_Tests
         Test(ExitCode.ParseError, "admin", "--invalid");
     }
 
+    static readonly string[] ExpectedQuoted = ["client", "add", "--certificate", @"C:\certs\pc 42.cer", "--name", "Lab PC 42"];
+    static readonly string[] ExpectedEmpty = ["user", "add", "--name", ""];
+
     [TestMethod]
     public void SplitCommandLine()
     {
-        CollectionAssert.AreEqual(new[] { "client", "add", "--certificate", @"C:\certs\pc 42.cer", "--name", "Lab PC 42" },
+        CollectionAssert.AreEqual(ExpectedQuoted,
             CommandHandlers.SplitCommandLine(@"client add --certificate ""C:\certs\pc 42.cer""  --name ""Lab PC 42"" "));
-        CollectionAssert.AreEqual(new[] { "user", "add", "--name", "" },
+        CollectionAssert.AreEqual(ExpectedEmpty,
             CommandHandlers.SplitCommandLine(@"user add --name """""));
         Assert.IsEmpty(CommandHandlers.SplitCommandLine("   "));
     }

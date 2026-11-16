@@ -121,6 +121,17 @@ local administrator; `usbipd admin` signs in once for several commands.
 | Allow, disable or remove a client PC | `usbipd client add / disable / enable / remove` |
 | End a session now | `usbipd detach --busid <BUSID>` |
 | See devices, users, clients | `usbipd list`, `usbipd user list`, `usbipd client list` |
+| Rotate the OTP certificate | See below |
+
+**Rotating the certificate of the OTP secrets** (for example when the server certificate is renewed):
+
+1. Install the new certificate in Local Computer > Personal, with a private key the service can use.
+2. Point `usbipd:Otp:CertificateThumbprint` (or the TLS server certificate, if the setting is empty) to it and
+   restart the service. **Keep the old certificate installed.**
+3. The service re-encrypts every secret to the new certificate when it starts.
+4. When `usbipd user otp status` shows no secrets on the old certificate, remove it.
+
+If a certificate is removed too early, the secrets on it are lost: those users need `usbipd user otp reset`.
 
 Device states in `usbipd list`:
 
@@ -143,11 +154,14 @@ Device states in `usbipd list`:
   at bind time (port and a fingerprint of its USB descriptors).
 - **Administration** requires a local administrator's sign-in for every change, also in an elevated window. The
   database connection runs as that person, and every change is written to `usbipd.AdminAudit`.
+- **OTP secrets** are encrypted with the ConfigEncrypt library's RSA certificate format (stored as `enc:` + Base64;
+  AES-256-GCM, key wrapped with the certificate's RSA key) to the TLS server certificate, or to
+  `usbipd:Otp:CertificateThumbprint`. Administrators encrypt with the public key; only the
+  service, which has the private key, can decrypt. Each secret only decrypts for its own user.
 - **No attaches** while the database cannot be reached.
 
 Known limits:
 
-- OTP secrets are stored unencrypted in SQL Server for now. Restrict who can read the database and its backups.
 - A device without a USB serial number is identified by its port, and a programmable device can copy another device's
   descriptors. Keep the servers and their USB ports physically secured.
 - The client driver is test-signed for now (see the client README).
@@ -187,6 +201,7 @@ For debug detail as well, stop the service and run it in an elevated console:
 | `usbipd:Tls:HandshakeTimeoutSeconds` | 10 | |
 | `usbipd:Tls:RevocationMode` | NoCheck | `NoCheck`, `Online` or `Offline` for client certificates |
 | `usbipd:Otp:Issuer` | QSI USB/IP | Name shown in authenticator apps |
+| `usbipd:Otp:CertificateThumbprint` | TLS server certificate | RSA certificate in Local Computer > Personal that OTP secrets are encrypted to |
 | `usbipd:Session:MaxDurationMinutes` | 10 | Hard limit per attach |
 | `usbipd:Session:ImportTimeoutSeconds` | 10 | Time between sign-in and import |
 | `usbipd:Session:RecheckIntervalSeconds` | 2 | How often active sessions are re-checked |

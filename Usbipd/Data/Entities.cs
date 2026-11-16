@@ -29,10 +29,8 @@ sealed class User
 }
 
 /// <summary>
-/// The TOTP secret of a user (RFC 6238: HMAC-SHA1, 6 digits, 30 seconds).
-/// <para>
-/// Stored in plain text for now; encryption with key rotation is planned (step 8e). Protect read access to this table.
-/// </para>
+/// The TOTP secret of a user (RFC 6238: HMAC-SHA1, 6 digits, 30 seconds), encrypted to a certificate
+/// (see <see cref="Cryptography"/> and <see cref="OtpCertificate"/>).
 /// </summary>
 sealed class OtpSecret
 {
@@ -40,11 +38,19 @@ sealed class OtpSecret
 
     public User? User { get; set; }
 
-    public byte[] Secret { get; set; } = [];
+    /// <summary>
+    /// The secret, encrypted for this user only (see <see cref="Cryptography"/>).
+    /// </summary>
+    public string ProtectedSecret { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The certificate <see cref="ProtectedSecret"/> is encrypted to; differs from the current one during a rotation.
+    /// </summary>
+    public string CertificateThumbprint { get; set; } = string.Empty;
 
     /// <summary>
     /// The time step of the last accepted code; a code is accepted only for a later step, so it cannot be used twice.
-    /// The only column the service writes.
+    /// The service writes this column, and re-encrypts the secret during a rotation.
     /// </summary>
     public long LastAcceptedStep { get; set; }
 
@@ -115,6 +121,11 @@ sealed class Bind
     public string? SerialNumber { get; set; }
 
     public string? Interfaces { get; set; }
+
+    /// <summary>
+    /// See <see cref="DeviceIdentity.ArrivedUtc"/>.
+    /// </summary>
+    public DateTime? ArrivedUtc { get; set; }
 
     /// <summary>
     /// The run of the service in which an administrator confirmed the bind ('usbipd bind', 'usbipd bind --review').

@@ -80,7 +80,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             }
             return ExitCode.Failure;
         }
-        if (existing?.Fingerprint is not null && identity.GetMismatch(existing.Fingerprint, existing.LocationPath) is { } mismatch)
+        if (existing?.Fingerprint is not null && identity.GetMismatch(existing.Fingerprint, existing.LocationPath, existing.ArrivedUtc) is { } mismatch)
         {
             console.ReportError($"Device with busid '{busId}' is not confirmed: {mismatch}. " +
                 $"To share the device that is there now, run 'usbipd unbind --guid {guid:D}' and bind it again.");
@@ -112,6 +112,7 @@ sealed partial class CommandHandlers : ICommandHandlers
         console.Out.WriteLine($"  VID:PID:      {identity.HardwareId}");
         console.Out.WriteLine($"  Serial:       {identity.SerialNumber ?? "none (identified by port)"}");
         console.Out.WriteLine($"  Port:         {identity.LocationPath}");
+        console.Out.WriteLine($"  Plugged in:   {identity.ArrivedUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss}");
         console.Out.WriteLine($"  Interfaces:   {identity.Interfaces}");
         console.Out.WriteLine($"  Fingerprint:  {identity.Fingerprint}");
 #pragma warning restore CA1849
@@ -211,7 +212,7 @@ sealed partial class CommandHandlers : ICommandHandlers
                     identity = await DeviceIdentity.ReadAsync(windowsDevice);
                     if (bind.Fingerprint is not null)
                     {
-                        problem = identity.GetMismatch(bind.Fingerprint, bind.LocationPath);
+                        problem = identity.GetMismatch(bind.Fingerprint, bind.LocationPath, bind.ArrivedUtc);
                     }
                 }
                 catch (InvalidOperationException ex) when (ex is not DatabaseConfigurationException)
@@ -240,7 +241,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             }
             else
             {
-                console.Out.WriteLine("  Result:       the same port and the same USB descriptors as when it was bound");
+                console.Out.WriteLine("  Result:       the same port and USB descriptors, not unplugged since it was bound");
             }
             if (!yes)
             {

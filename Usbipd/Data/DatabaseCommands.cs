@@ -23,7 +23,7 @@ static class DatabaseCommands
         IF DATABASE_PRINCIPAL_ID(N'usbipd_admin') IS NULL EXEC(N'CREATE ROLE [usbipd_admin]');
         GRANT SELECT ON SCHEMA::[usbipd] TO [usbipd_service];
         GRANT INSERT, UPDATE, DELETE ON OBJECT::[usbipd].[Attachments] TO [usbipd_service];
-        GRANT UPDATE ([LastAcceptedStep]) ON OBJECT::[usbipd].[OtpSecrets] TO [usbipd_service];
+        GRANT UPDATE ([LastAcceptedStep], [ProtectedSecret], [CertificateThumbprint]) ON OBJECT::[usbipd].[OtpSecrets] TO [usbipd_service];
         GRANT DELETE ON OBJECT::[usbipd].[Binds] TO [usbipd_service];
         GRANT INSERT, UPDATE ON OBJECT::[usbipd].[ServerRuns] TO [usbipd_service];
         GRANT INSERT ON OBJECT::[usbipd].[AdminAudit] TO [usbipd_service];

@@ -27,7 +27,10 @@ namespace Usbipd;
 /// <param name="HardwareId">VID:PID.</param>
 /// <param name="SerialNumber">See <see cref="WindowsDevice.SerialNumber"/>.</param>
 /// <param name="Interfaces">The interface classes, for administrators (for example "03 HID, 08 Mass storage").</param>
-sealed record DeviceIdentity(string Fingerprint, string LocationPath, string HardwareId, string? SerialNumber, string Interfaces)
+/// <param name="ArrivedUtc">See <see cref="WindowsDevice.LastArrivalUtc"/>. Changes whenever the device is plugged in,
+/// in whatever state it is (also when its driver is not running and no removal event is seen), so a replug is always caught.</param>
+sealed record DeviceIdentity(string Fingerprint, string LocationPath, string HardwareId, string? SerialNumber, string Interfaces,
+    DateTime ArrivedUtc)
 {
     const int MaxConfigurations = 8;
 
@@ -47,6 +50,7 @@ sealed record DeviceIdentity(string Fingerprint, string LocationPath, string Har
             throw new InvalidOperationException("the device is on a hub that is not supported");
         }
         var locationPath = device.LocationPath ?? throw new InvalidOperationException("Windows does not report where the device is plugged in");
+        var arrivedUtc = device.LastArrivalUtc ?? throw new InvalidOperationException("Windows does not report when the device was plugged in");
         try
         {
             using var hubFile = device.OpenHubInterface();
@@ -74,7 +78,7 @@ sealed record DeviceIdentity(string Fingerprint, string LocationPath, string Har
             var hardwareId = string.Create(CultureInfo.InvariantCulture,
                 $"{info.DeviceDescriptor.idVendor:x4}:{info.DeviceDescriptor.idProduct:x4}");
             return new(Convert.ToHexString(hash.GetHashAndReset()), locationPath, hardwareId, device.SerialNumber,
-                DescribeInterfaces(interfaceClasses));
+                DescribeInterfaces(interfaceClasses), arrivedUtc);
         }
         catch (Exception ex) when (ex is Win32Exception or FileNotFoundException or IOException)
         {
@@ -85,11 +89,13 @@ sealed record DeviceIdentity(string Fingerprint, string LocationPath, string Har
     /// <summary>
     /// Why this (current) identity is not the recorded one, or <see langword="null"/> if it is.
     /// </summary>
-    public string? GetMismatch(string? recordedFingerprint, string? recordedLocationPath)
+    public string? GetMismatch(string? recordedFingerprint, string? recordedLocationPath, DateTime? recordedArrivedUtc)
     {
         return recordedFingerprint is null || recordedLocationPath is null ? "no identity was recorded for the bind"
             : !string.Equals(LocationPath, recordedLocationPath, StringComparison.OrdinalIgnoreCase) ? "the device is in another port than when it was bound"
             : !string.Equals(Fingerprint, recordedFingerprint, StringComparison.OrdinalIgnoreCase) ? "the device is not the one that was bound (its USB descriptors differ)"
+            : recordedArrivedUtc is null ? "no plug-in time was recorded for the bind; bind it again"
+            : ArrivedUtc != recordedArrivedUtc.Value ? "the device was unplugged and plugged in again since it was bound"
             : null;
     }
 

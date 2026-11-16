@@ -39,14 +39,15 @@ static class UserStore
         return ex is InvalidOperationException or SqlException or DbUpdateException;
     }
 
-    internal sealed record UserMapping(string UserName, string? ServerName, string? InstanceId, string? Description, bool HasOtpSecret);
+    internal sealed record UserMapping(string UserName, string? ServerName, string? InstanceId, string? Description, string? OtpCertificateThumbprint);
 
     public static async Task<List<UserMapping>> ListAsync(UsbipdDbContext db, CancellationToken cancellationToken)
     {
         return await db.Users.AsNoTracking()
             .OrderBy(u => u.Name)
             .Select(u => new UserMapping(u.Name, u.UserDevice!.Device!.ServerName, u.UserDevice.Device.InstanceId,
-                u.UserDevice.Device.Description, u.OtpSecret != null))
+                u.UserDevice.Device.Description,
+                u.OtpSecret != null && u.OtpSecret.ProtectedSecret != "" ? u.OtpSecret.CertificateThumbprint : null))
             .ToListAsync(cancellationToken);
     }
 
@@ -123,31 +124,28 @@ static class UserStore
 
     /// <summary>
     /// Gives the user a new TOTP secret, replacing any existing one (codes from the old secret stop working).
+    /// The secret is encrypted to <paramref name="certificate"/> for this user only; the user must be saved already (it needs its id).
     /// </summary>
     /// <returns>The secret, to show to the administrator once.</returns>
-    public static byte[] SetNewOtpSecret(User user)
+    public static byte[] SetNewOtpSecret(User user, System.Security.Cryptography.X509Certificates.X509Certificate2 certificate)
     {
+        if (user.Id == 0)
+        {
+            throw new InvalidOperationException("The user must be saved before it gets a secret.");
+        }
         var secret = Totp.CreateSecret();
+        var protectedSecret = Cryptography.Encrypt(user.Id, secret, certificate);
         var now = DateTime.UtcNow;
         var account = CurrentAccount;
-        if (user.OtpSecret is null)
+        user.OtpSecret ??= new()
         {
-            user.OtpSecret = new()
-            {
-                User = user,
-                Secret = secret,
-                LastAcceptedStep = 0,
-                CreatedUtc = now,
-                CreatedBy = account,
-            };
-        }
-        else
-        {
-            user.OtpSecret.Secret = secret;
-            user.OtpSecret.LastAcceptedStep = 0;
-            user.OtpSecret.CreatedUtc = now;
-            user.OtpSecret.CreatedBy = account;
-        }
+            User = user,
+        };
+        user.OtpSecret.ProtectedSecret = protectedSecret;
+        user.OtpSecret.CertificateThumbprint = certificate.Thumbprint.ToUpperInvariant();
+        user.OtpSecret.LastAcceptedStep = 0;
+        user.OtpSecret.CreatedUtc = now;
+        user.OtpSecret.CreatedBy = account;
         return secret;
     }
 

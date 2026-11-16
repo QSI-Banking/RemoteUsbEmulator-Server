@@ -668,9 +668,19 @@ static class Program
                 resetCommand.SetAction(async (parseResult, cancellationToken) => (int)
                     await commandHandlers.UserOtpReset(parseResult.GetRequiredValue(nameOption), console, cancellationToken)
                 );
+                //
+                //  user otp status
+                //
+                var statusCommand = new Command("status", "Show the certificates of the secrets\0" +
+                    "Shows which certificates the secrets are encrypted to. After a certificate rotation, the old certificate " +
+                    "can be removed once no secret uses it.");
+                statusCommand.SetAction(async (parseResult, cancellationToken) => (int)
+                    await commandHandlers.UserOtpStatus(console, cancellationToken)
+                );
                 var otpCommand = new Command("otp", "Manage one-time password secrets\0" +
                     "A user signs in with a code from an authenticator app (TOTP). 'usbipd user add' creates the secret of a new user.");
                 otpCommand.Subcommands.Add(resetCommand);
+                otpCommand.Subcommands.Add(statusCommand);
                 userCommand.Subcommands.Add(otpCommand);
             }
             rootCommand.Subcommands.Add(userCommand);

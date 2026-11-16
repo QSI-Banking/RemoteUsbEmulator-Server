@@ -64,18 +64,23 @@ sealed partial class CommandHandlers : ICommandHandlers
             var databaseDevice = await UserStore.GetOrAddDeviceAsync(db, device.InstanceId, device.Description, cancellationToken);
             var user = await UserStore.SetMappingAsync(db, userName, databaseDevice, cancellationToken);
             UserStore.Audit(db, existing is null ? "user add" : "user remap", $"{user.Name} -> {databaseDevice.InstanceId}");
+            // Saved first: the secret is encrypted for this user's id.
+            _ = await db.SaveChangesAsync(cancellationToken);
+
             // A new user (or one without a secret yet) gets a TOTP secret; an existing secret is kept.
             byte[]? secret = null;
-            if (user.OtpSecret is null && SecretDisplay.CheckCanShow(console))
+            var hasSecret = user.OtpSecret is not null && user.OtpSecret.ProtectedSecret.Length > 0;
+            if (!hasSecret && SecretDisplay.CheckCanShow(console))
             {
-                secret = UserStore.SetNewOtpSecret(user);
+                using var certificate = Data.OtpCertificate.Load(Data.Database.LoadConfiguration());
+                secret = UserStore.SetNewOtpSecret(user, certificate);
                 UserStore.Audit(db, "user otp reset", user.Name);
+                _ = await db.SaveChangesAsync(cancellationToken);
             }
-            else if (user.OtpSecret is null)
+            else if (!hasSecret)
             {
                 console.ReportWarning($"User '{user.Name}' has no one-time password secret yet; run 'usbipd user otp reset --name {user.Name}' in an interactive console.");
             }
-            _ = await db.SaveChangesAsync(cancellationToken);
 
             console.ReportInfo($"User '{user.Name}' mapped to '{device.Description}' ({device.InstanceId}).");
             if (secret is not null)
@@ -121,7 +126,8 @@ sealed partial class CommandHandlers : ICommandHandlers
                 console.ReportError($"There is no user '{userName}'; add the user first with 'usbipd user add'.");
                 return ExitCode.Failure;
             }
-            var secret = UserStore.SetNewOtpSecret(user);
+            using var certificate = Data.OtpCertificate.Load(Data.Database.LoadConfiguration());
+            var secret = UserStore.SetNewOtpSecret(user, certificate);
             UserStore.Audit(db, "user otp reset", user.Name);
             _ = await db.SaveChangesAsync(cancellationToken);
             ReportOtpSecret(user.Name, secret, console);
@@ -185,6 +191,15 @@ sealed partial class CommandHandlers : ICommandHandlers
 
         var serverName = UserStore.ServerName;
         var boundDevices = Data.BindStore.GetBoundDevices().ToList();
+        string? currentOtpThumbprint = null;
+        try
+        {
+            currentOtpThumbprint = Data.OtpCertificate.GetThumbprint(Data.Database.LoadConfiguration());
+        }
+        catch (InvalidOperationException ex)
+        {
+            console.ReportWarning($"The certificate for OTP secrets is not configured: {ex.Message}");
+        }
 #pragma warning disable CA1849 // Call async methods when in an async method (console output, as the other list commands)
         console.Out.WriteLine("Users:");
         console.Out.WriteLine($"{"USER",-24}  {"OTP",-7}  {"BUSID",-5}  {"STATE",-22}  DEVICE");
@@ -213,13 +228,86 @@ sealed partial class CommandHandlers : ICommandHandlers
                 }
             }
             console.Out.Write($"{user.UserName,-24}  ");
-            console.Out.Write($"{(user.HasOtpSecret ? "Set" : "Not set"),-7}  ");
+            console.Out.Write($"{OtpState(user.OtpCertificateThumbprint, currentOtpThumbprint),-7}  ");
             console.Out.Write($"{busIdText,-5}  ");
             console.Out.Write($"{state,-22}  ");
             console.Out.WriteLine(user.Description ?? "-");
         }
         console.Out.WriteLine();
 #pragma warning restore CA1849 // Call async methods when in an async method
+        return ExitCode.Success;
+    }
+
+    /// <summary>
+    /// "Set", "Not set", or "Old" while a rotation has not re-encrypted the secret to the current certificate yet.
+    /// </summary>
+    static string OtpState(string? thumbprint, string? currentThumbprint)
+    {
+        return thumbprint is null ? "Not set"
+            : currentThumbprint is null || string.Equals(thumbprint, currentThumbprint, StringComparison.OrdinalIgnoreCase) ? "Set"
+            : "Old";
+    }
+
+    /// <summary>
+    /// 'usbipd user otp status': which certificates the OTP secrets are encrypted to, for a rotation.
+    /// </summary>
+    async Task<ExitCode> ICommandHandlers.UserOtpStatus(IConsole console, CancellationToken cancellationToken)
+    {
+        if (!CheckInstalled(console))
+        {
+            return ExitCode.Failure;
+        }
+
+        List<(string Thumbprint, int Count)> counts;
+        try
+        {
+            await using var db = UserStore.Open();
+            counts = [.. (await db.OtpSecrets.AsNoTracking().Where(o => o.ProtectedSecret != "")
+                .GroupBy(o => o.CertificateThumbprint).Select(g => new { g.Key, Count = g.Count() })
+                .ToListAsync(cancellationToken)).Select(g => (g.Key, g.Count))];
+        }
+        catch (Exception ex) when (UserStore.IsDatabaseError(ex))
+        {
+            console.ReportError($"User database: {ex.Message}");
+            return ExitCode.Failure;
+        }
+
+        string current;
+        try
+        {
+            current = Data.OtpCertificate.GetThumbprint(Data.Database.LoadConfiguration());
+        }
+        catch (InvalidOperationException ex)
+        {
+            console.ReportError($"The certificate for OTP secrets is not configured: {ex.Message}");
+            return ExitCode.Failure;
+        }
+
+#pragma warning disable CA1849 // Call async methods when in an async method (console output, as the other list commands)
+        console.Out.WriteLine("OTP secrets by certificate:");
+        console.Out.WriteLine($"{"THUMBPRINT",-40}  {"USERS",5}  {"EXPIRES",-10}  STATE");
+        foreach (var thumbprint in counts.Select(c => c.Thumbprint).Append(current).Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(t => !string.Equals(t, current, StringComparison.OrdinalIgnoreCase)))
+        {
+            var count = counts.Where(c => string.Equals(c.Thumbprint, thumbprint, StringComparison.OrdinalIgnoreCase)).Sum(c => c.Count);
+            using var certificate = Data.Cryptography.FindInLocalMachineMy(thumbprint);
+            var expires = certificate?.NotAfter.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "-";
+            var state = string.Equals(thumbprint, current, StringComparison.OrdinalIgnoreCase)
+                ? (certificate is null ? "Current, NOT INSTALLED" : "Current")
+                : certificate is null ? "Old, NOT INSTALLED (secrets lost; reset these users)"
+                : count == 0 ? "Old, unused (can be removed)"
+                : "Old, re-encrypting";
+            console.Out.WriteLine($"{thumbprint,-40}  {count,5}  {expires,-10}  {state}");
+        }
+        console.Out.WriteLine();
+#pragma warning restore CA1849
+        using (var certificate = Data.Cryptography.FindInLocalMachineMy(current))
+        {
+            if (certificate is not null && certificate.NotAfter < DateTime.Now.AddDays(30))
+            {
+                console.ReportWarning($"The certificate for OTP secrets expires on {certificate.NotAfter:d}; plan a rotation.");
+            }
+        }
         return ExitCode.Success;
     }
 
