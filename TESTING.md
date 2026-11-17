@@ -12,8 +12,8 @@ Run it before a release and after changes to the area a section covers.
 ## Setup
 
 - **Server**: Windows x64 with SQL Server (Express is fine), the server MSI, test certificates (see the README).
-  Two USB devices: one with a serial number (for example a webcam) and one without (for example a basic mouse or a
-  license dongle). A third device of a different kind for the swap tests.
+  Two USB devices: one with a serial number (for example a webcam) and one without (for example a basic mouse or the
+  NCR Sentinel key). A third device of a different kind for the swap tests.
 - **Client**: a second PC or a Hyper-V VM with test signing on, the client installer, a client certificate.
   From a Hyper-V VM, the server address is `<host computer name>.mshome.net`.
 - **Users**: two test users, each mapped to one of the two devices and enrolled in an authenticator app.
@@ -171,6 +171,6 @@ $all = 1..101 | ForEach-Object { try { Open-Idle } catch { "refused: $_" } }; $a
 
 | # | Steps | Expected |
 |---|---|---|
-| 11.1 | Webcam (isochronous): attach, open the camera app on the client for 2 minutes, detach | Video works; clean detach |
-| 11.2 | License dongle: bind, attach, run the software that needs it | The software finds its license |
-| 11.3 | NCR Sentinel key: check the instance path, then bind | Bound; identified by port unless it has a serial |
+| 11.1 | Connection integrity: attach the webcam, open the camera app on the client for 2 minutes, detach. A webcam streams continuously (isochronous transfers), so dropped or corrupted data shows up at once | Video is smooth for the whole 2 minutes, with no freezes or artifacts; clean detach |
+| 11.2 | NCR Sentinel key: check the instance path, then bind | Bound; identified by port unless it has a serial |
+| 11.3 | NCR Sentinel key: attach, enter diagnostics mode. | The machine can enter diagnostics. |
