@@ -56,7 +56,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             await using var db = UserStore.Open();
             if (await db.ClientCertificates.AnyAsync(c => c.Thumbprint == thumbprint, cancellationToken))
             {
-                console.ReportError($"Client certificate {thumbprint} is already listed; see 'usbipd client list'.");
+                console.ReportError($"Client certificate {thumbprint} is already listed; see 'qsiusbd client list'.");
                 return ExitCode.Failure;
             }
             _ = db.ClientCertificates.Add(new()
@@ -143,7 +143,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             var certificate = await db.ClientCertificates.SingleOrDefaultAsync(c => c.Thumbprint == thumbprint, cancellationToken);
             if (certificate is null)
             {
-                console.ReportError($"Client certificate {thumbprint} is not listed; see 'usbipd client list'.");
+                console.ReportError($"Client certificate {thumbprint} is not listed; see 'qsiusbd client list'.");
                 return ExitCode.Failure;
             }
             if (certificate.Enabled == enabled)
@@ -184,7 +184,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             var certificate = await db.ClientCertificates.SingleOrDefaultAsync(c => c.Thumbprint == thumbprint, cancellationToken);
             if (certificate is null)
             {
-                console.ReportError($"Client certificate {thumbprint} is not listed; see 'usbipd client list'.");
+                console.ReportError($"Client certificate {thumbprint} is not listed; see 'qsiusbd client list'.");
                 return ExitCode.Failure;
             }
             _ = db.ClientCertificates.Remove(certificate);

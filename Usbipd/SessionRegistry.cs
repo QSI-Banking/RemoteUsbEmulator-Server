@@ -94,7 +94,7 @@ sealed class AttachSession : IDisposable
     public string? EndReason => Volatile.Read(ref RevokedReason);
 
     /// <summary>
-    /// Whether the attachment is recorded in the database; from then on, deleting the record ('usbipd detach') ends the session.
+    /// Whether the attachment is recorded in the database; from then on, deleting the record ('qsiusbd detach') ends the session.
     /// </summary>
     public bool IsRecorded => Recorded;
 

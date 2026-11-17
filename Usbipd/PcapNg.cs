@@ -22,17 +22,17 @@ sealed partial class PcapNg
     {
         Logger = logger;
 
-        var path = config["usbipd:PcapNg:Path"];
+        var path = config["qsiusbd:PcapNg:Path"];
         if (Logger.IsEnabled(LogLevel.Debug))
         {
-            Logger.Debug($"usbipd:PcapNg:Path = '{path}'");
+            Logger.Debug($"qsiusbd:PcapNg:Path = '{path}'");
         }
         if (string.IsNullOrEmpty(path))
         {
             return;
         }
 
-        var snapLength = config["usbipd:PcapNg:SnapLength"];
+        var snapLength = config["qsiusbd:PcapNg:SnapLength"];
         if (uint.TryParse(snapLength, out SnapLength))
         {
             // The absolute minimum, just the URB without any data.
@@ -47,7 +47,7 @@ sealed partial class PcapNg
         }
         if (Logger.IsEnabled(LogLevel.Debug))
         {
-            Logger.Debug($"usbipd:PcapNg:SnapLength = {(SnapLength == 0 ? "unlimited" : SnapLength)}");
+            Logger.Debug($"qsiusbd:PcapNg:SnapLength = {(SnapLength == 0 ? "unlimited" : SnapLength)}");
         }
 
         try

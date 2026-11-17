@@ -19,8 +19,8 @@ sealed class TlsSettings_Tests
     {
         var data = new Dictionary<string, string?>
         {
-            { "usbipd:Tls:ServerCertificateThumbprint", ServerThumbprint },
-            { "usbipd:Tls:ClientCaThumbprints:0", CaThumbprint },
+            { "qsiusbd:Tls:ServerCertificateThumbprint", ServerThumbprint },
+            { "qsiusbd:Tls:ClientCaThumbprints:0", CaThumbprint },
         };
         foreach (var (key, value) in values)
         {
@@ -47,18 +47,18 @@ sealed class TlsSettings_Tests
     public void Read_AllowedClientThumbprints_Moved()
     {
         _ = Assert.ThrowsExactly<InvalidOperationException>(() => TlsSettings.Read(CreateConfiguration(
-            ("usbipd:Tls:AllowedClientThumbprints:0", OtherThumbprint))));
+            ("qsiusbd:Tls:AllowedClientThumbprints:0", OtherThumbprint))));
     }
 
     [TestMethod]
     public void Read_AllValues()
     {
         var settings = TlsSettings.Read(CreateConfiguration(
-            ("usbipd:Tls:Port", "4443"),
-            ("usbipd:Tls:ListenAddress", "192.168.1.10"),
-            ("usbipd:Tls:ClientCaThumbprints:1", OtherThumbprint),
-            ("usbipd:Tls:HandshakeTimeoutSeconds", "30"),
-            ("usbipd:Tls:RevocationMode", "online")));
+            ("qsiusbd:Tls:Port", "4443"),
+            ("qsiusbd:Tls:ListenAddress", "192.168.1.10"),
+            ("qsiusbd:Tls:ClientCaThumbprints:1", OtherThumbprint),
+            ("qsiusbd:Tls:HandshakeTimeoutSeconds", "30"),
+            ("qsiusbd:Tls:RevocationMode", "online")));
 
         Assert.AreEqual(4443, settings.Port);
         Assert.AreEqual(IPAddress.Parse("192.168.1.10"), settings.ListenAddress);
@@ -72,8 +72,8 @@ sealed class TlsSettings_Tests
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            { "usbipd:Tls:ServerCertificateThumbprint", ServerThumbprint },
-            { "usbipd:Tls:ClientCaThumbprints", $"{CaThumbprint}, {OtherThumbprint}" },
+            { "qsiusbd:Tls:ServerCertificateThumbprint", ServerThumbprint },
+            { "qsiusbd:Tls:ClientCaThumbprints", $"{CaThumbprint}, {OtherThumbprint}" },
         }).Build();
 
         var settings = TlsSettings.Read(configuration);
@@ -105,7 +105,7 @@ sealed class TlsSettings_Tests
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            { "usbipd:Tls:ClientCaThumbprints:0", CaThumbprint },
+            { "qsiusbd:Tls:ClientCaThumbprints:0", CaThumbprint },
         }).Build();
 
         _ = Assert.ThrowsExactly<InvalidOperationException>(() => TlsSettings.Read(configuration));
@@ -116,21 +116,21 @@ sealed class TlsSettings_Tests
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            { "usbipd:Tls:ServerCertificateThumbprint", ServerThumbprint },
+            { "qsiusbd:Tls:ServerCertificateThumbprint", ServerThumbprint },
         }).Build();
 
         _ = Assert.ThrowsExactly<InvalidOperationException>(() => TlsSettings.Read(configuration));
     }
 
     [TestMethod]
-    [DataRow("usbipd:Tls:Port", "0")]
-    [DataRow("usbipd:Tls:Port", "65536")]
-    [DataRow("usbipd:Tls:Port", "abc")]
-    [DataRow("usbipd:Tls:ListenAddress", "not-an-address")]
-    [DataRow("usbipd:Tls:HandshakeTimeoutSeconds", "0")]
-    [DataRow("usbipd:Tls:HandshakeTimeoutSeconds", "301")]
-    [DataRow("usbipd:Tls:RevocationMode", "Sometimes")]
-    [DataRow("usbipd:Tls:RevocationMode", "1")]
+    [DataRow("qsiusbd:Tls:Port", "0")]
+    [DataRow("qsiusbd:Tls:Port", "65536")]
+    [DataRow("qsiusbd:Tls:Port", "abc")]
+    [DataRow("qsiusbd:Tls:ListenAddress", "not-an-address")]
+    [DataRow("qsiusbd:Tls:HandshakeTimeoutSeconds", "0")]
+    [DataRow("qsiusbd:Tls:HandshakeTimeoutSeconds", "301")]
+    [DataRow("qsiusbd:Tls:RevocationMode", "Sometimes")]
+    [DataRow("qsiusbd:Tls:RevocationMode", "1")]
     public void Read_InvalidValue(string key, string value)
     {
         _ = Assert.ThrowsExactly<InvalidOperationException>(() => TlsSettings.Read(CreateConfiguration((key, value))));

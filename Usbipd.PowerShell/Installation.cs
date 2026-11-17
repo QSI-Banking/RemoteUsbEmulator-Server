@@ -15,14 +15,14 @@ static class Installation
     {
         // Example regOutput:
         //
-        // HKEY_LOCAL_MACHINE\SOFTWARE\usbipd-win
-        //     APPLICATIONFOLDER    REG_SZ    C:\Program Files\usbipd-win\
+        // HKEY_LOCAL_MACHINE\SOFTWARE\QSIUSBD
+        //     APPLICATIONFOLDER    REG_SZ    C:\Program Files\QSIUSBD\
         //     Version REG_SZ       3.0.0
         //
-        // HKEY_LOCAL_MACHINE\SOFTWARE\usbipd-win\Devices
+        // HKEY_LOCAL_MACHINE\SOFTWARE\QSIUSBD\Devices
 
         var match = Regex.Match(regOutput, @$"^\s*{valueName}\s+REG_SZ\s+(.*)$", RegexOptions.Multiline);
-        return match.Success ? match.Groups[1].Value.TrimEnd() : throw new ApplicationFailedException("usbipd-win is not installed.");
+        return match.Success ? match.Groups[1].Value.TrimEnd() : throw new ApplicationFailedException("QSIUSBD is not installed.");
     }
 
     public static string ExePath
@@ -35,7 +35,7 @@ static class Installation
             var startInfo = new ProcessStartInfo
             {
                 FileName = regExe,
-                Arguments = @"query HKLM\SOFTWARE\usbipd-win /reg:64",
+                Arguments = @"query HKLM\SOFTWARE\QSIUSBD /reg:64",
                 UseShellExecute = false,
                 StandardOutputEncoding = Encoding.UTF8,
                 StandardErrorEncoding = Encoding.UTF8,
@@ -67,19 +67,19 @@ static class Installation
             }
 
             var applicationFolder = GetRegistryStringValue(stdout, "APPLICATIONFOLDER");
-            var exeFile = Path.Combine(Path.GetFullPath(applicationFolder), "usbipd.exe");
+            var exeFile = Path.Combine(Path.GetFullPath(applicationFolder), "qsiusbd.exe");
             if (!Version.TryParse(GetRegistryStringValue(stdout, "Version"), out var version) || !File.Exists(exeFile))
             {
-                throw new ApplicationFailedException("usbipd-win is not installed.");
+                throw new ApplicationFailedException("QSIUSBD is not installed.");
             }
             if (version != Version.Parse(GitVersionInformation.MajorMinorPatch))
             {
                 throw new ApplicationFailedException(
-                    $"PowerShell module version {GitVersionInformation.MajorMinorPatch} does not match installed usbipd-win version {version}.");
+                    $"PowerShell module version {GitVersionInformation.MajorMinorPatch} does not match installed QSIUSBD version {version}.");
             }
 #if DEBUG
             return Path.GetFullPath(Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetCallingAssembly().Location),
-                @"..\..\..\..\Usbipd\bin\x64\Debug\net10.0\usbipd.exe"));
+                @"..\..\..\..\Usbipd\bin\x64\Debug\net10.0\qsiusbd.exe"));
 #else
             return exeFile;
 #endif

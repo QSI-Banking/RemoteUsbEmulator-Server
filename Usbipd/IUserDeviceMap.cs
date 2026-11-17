@@ -13,6 +13,6 @@ interface IUserDeviceMap
     /// <returns>The bind GUID, or <see langword="null"/> if no device is mapped to the user.</returns>
     Guid? GetDeviceGuid(string userName);
 
-    /// <returns>The bind GUIDs that have an attachment record; a missing record means 'usbipd detach' or unbind.</returns>
+    /// <returns>The bind GUIDs that have an attachment record; a missing record means 'qsiusbd detach' or unbind.</returns>
     IReadOnlySet<Guid> GetAttachedDevices();
 }

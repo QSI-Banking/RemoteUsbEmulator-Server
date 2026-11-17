@@ -8,7 +8,7 @@ using static Usbipd.ConsoleTools;
 namespace Usbipd;
 
 /// <summary>
-/// 'usbipd admin': sign in once, then run several commands (see <see cref="AdminAuthorization"/>).
+/// 'qsiusbd admin': sign in once, then run several commands (see <see cref="AdminAuthorization"/>).
 /// </summary>
 sealed partial class CommandHandlers : ICommandHandlers
 {
@@ -35,20 +35,20 @@ sealed partial class CommandHandlers : ICommandHandlers
             }
 #pragma warning disable CA1849 // Call async methods when in an async method (console output, as the other commands)
             console.Out.WriteLine($"""
-                Type usbipd commands without 'usbipd', for example: user add --name alice --busid 6-2
+                Type qsiusbd commands without 'qsiusbd', for example: user add --name alice --busid 6-2
                 'help' lists the commands, 'lock' signs out, 'exit' ends the session.
                 The session locks after {(int)AdminAuthorization.SessionIdleTimeout.TotalMinutes} minutes without a command, and after {(int)AdminAuthorization.SessionMaxDuration.TotalMinutes} minutes in total; the next change then asks again.
                 """);
             while (!cancellationToken.IsCancellationRequested)
             {
-                console.Out.Write("usbipd> ");
+                console.Out.Write("qsiusbd> ");
                 var line = await Console.In.ReadLineAsync(cancellationToken);
                 if (line is null)
                 {
                     break;
                 }
                 var args = SplitCommandLine(line);
-                if (args.Count > 0 && args[0].ToUpperInvariant() is "USBIPD" or "USBIPD.EXE")
+                if (args.Count > 0 && args[0].ToUpperInvariant() is "QSIUSBD" or "QSIUSBD.EXE")
                 {
                     args.RemoveAt(0);
                 }

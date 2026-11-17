@@ -116,7 +116,7 @@ sealed class TlsServerAuthenticator : IDisposable
         if (!issuedByTrustedCa)
         {
             Logger.ClientCertificateRejected(clientCertificate.Subject, clientCertificate.Thumbprint,
-                "not issued by a CA listed in usbipd:Tls:ClientCaThumbprints");
+                "not issued by a CA listed in qsiusbd:Tls:ClientCaThumbprints");
             return false;
         }
 
@@ -135,7 +135,7 @@ sealed class TlsServerAuthenticator : IDisposable
         if (!allowed)
         {
             Logger.ClientCertificateRejected(clientCertificate.Subject, clientCertificate.Thumbprint,
-                "not on the client certificate list, or disabled ('usbipd client list')");
+                "not on the client certificate list, or disabled ('qsiusbd client list')");
             return false;
         }
         return true;

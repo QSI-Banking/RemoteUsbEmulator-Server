@@ -11,7 +11,7 @@ namespace Usbipd.Data;
 
 /// <summary>
 /// Connection to the usbipd database. The connection string is ConnectionStrings:Usbipd in appsettings.json
-/// next to usbipd.exe (or the environment variable ConnectionStrings__Usbipd). Use Windows authentication:
+/// next to qsiusbd.exe (or the environment variable ConnectionStrings__Usbipd). Use Windows authentication:
 /// the service connects as its own account, the CLI as the administrator running it, so no password is stored.
 /// </summary>
 static class Database
@@ -25,7 +25,7 @@ static class Database
         @"Server=.\SQLEXPRESS;Database=usbipd;Integrated Security=True;TrustServerCertificate=True";
 
     /// <summary>
-    /// The same configuration the service reads: appsettings.json next to usbipd.exe, then environment variables.
+    /// The same configuration the service reads: appsettings.json next to qsiusbd.exe, then environment variables.
     /// </summary>
     public static IConfiguration LoadConfiguration()
     {
@@ -41,7 +41,7 @@ static class Database
         var connectionString = configuration.GetConnectionString(ConnectionStringName);
         return string.IsNullOrWhiteSpace(connectionString)
             ? throw new DatabaseConfigurationException(
-                $"ConnectionStrings:{ConnectionStringName} is required in appsettings.json next to usbipd.exe.")
+                $"ConnectionStrings:{ConnectionStringName} is required in appsettings.json next to qsiusbd.exe.")
             : connectionString;
     }
 
@@ -98,7 +98,7 @@ sealed class DatabaseConfigurationException : InvalidOperationException
 
 /// <summary>
 /// For 'dotnet ef migrations add' and 'dotnet ef migrations script'. Run those with the environment variable EfDesign=true,
-/// which adds the EF Core design package to the build (it is left out of usbipd.exe otherwise).
+/// which adds the EF Core design package to the build (it is left out of qsiusbd.exe otherwise).
 /// The connection string is only used if a command actually connects ('dotnet ef database update').
 /// </summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes",

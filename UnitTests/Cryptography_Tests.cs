@@ -24,7 +24,7 @@ sealed class Cryptography_Tests
         public StoredCertificate()
         {
             using var rsa = RSA.Create(2048);
-            var request = new CertificateRequest("CN=usbipd-unit-test", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            var request = new CertificateRequest("CN=qsiusbd-unit-test", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
             using var ephemeral = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
             Certificate = X509CertificateLoader.LoadPkcs12(ephemeral.Export(X509ContentType.Pfx), null,
                 X509KeyStorageFlags.UserKeySet | X509KeyStorageFlags.PersistKeySet);
@@ -109,7 +109,7 @@ sealed class Cryptography_Tests
     public void NonRsaCertificate_Refused()
     {
         using var ecdsa = ECDsa.Create();
-        var request = new CertificateRequest("CN=usbipd-unit-test", ecdsa, HashAlgorithmName.SHA256);
+        var request = new CertificateRequest("CN=qsiusbd-unit-test", ecdsa, HashAlgorithmName.SHA256);
         using var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
         _ = Assert.ThrowsExactly<InvalidOperationException>(() => Encrypt(42, certificate));
     }

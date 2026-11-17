@@ -9,7 +9,7 @@ using Usbipd.Data;
 namespace Usbipd;
 
 /// <summary>
-/// Checks a user's one-time password against the TOTP secret in SQL Server ('usbipd user otp reset').
+/// Checks a user's one-time password against the TOTP secret in SQL Server ('qsiusbd user otp reset').
 /// Each code is accepted once: the accepted time step is recorded, and only later steps are accepted after it.
 /// The secret is encrypted (see <see cref="Cryptography"/>).
 /// </summary>

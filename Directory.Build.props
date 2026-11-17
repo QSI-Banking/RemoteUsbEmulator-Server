@@ -54,7 +54,7 @@ SPDX-License-Identifier: GPL-3.0-only
     <RestoreLockedMode Condition="$(ContinuousIntegrationBuild)">true</RestoreLockedMode>
 
     <!-- Assembly metadata -->
-    <Product>usbipd-win</Product>
+    <Product>QSIUSBD</Product>
     <Company>QSI, Inc</Company>
   </PropertyGroup>
 

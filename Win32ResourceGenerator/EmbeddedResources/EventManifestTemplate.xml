@@ -2,7 +2,7 @@
 <instrumentationManifest xmlns="{{DefaultXmlNs}}" xmlns:win="{{WinXmlNs}}">
   <instrumentation>
     <events>
-      <provider name="{{ProviderName}}" guid="{{ProviderGuid}}" symbol="P" resourceFileName="usbipd.exe" messageFileName="usbipd.exe" message="$(string.Provider.Name)">
+      <provider name="{{ProviderName}}" guid="{{ProviderGuid}}" symbol="P" resourceFileName="qsiusbd.exe" messageFileName="qsiusbd.exe" message="$(string.Provider.Name)">
         <channels>
           <channel name="{{ProviderName}}/Operational" chid="O" type="Operational" enabled="true" message="$(string.Channel.Operational.Name)" />
           <channel name="{{ProviderName}}/Debug" chid="D" type="Debug" enabled="false" message="$(string.Channel.Debug.Name)" />

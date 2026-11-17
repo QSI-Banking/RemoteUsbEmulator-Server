@@ -42,7 +42,7 @@ sealed partial class CommandHandlers : ICommandHandlers
                         // It is smart enough to only log events when a listener is attached.
                         { $"Logging:Etw:LogLevel:{nameof(Usbipd)}", "Trace" }
                     })
-                // TLS and other settings, next to usbipd.exe (also when running from a console in another directory)
+                // TLS and other settings, next to qsiusbd.exe (also when running from a console in another directory)
                 .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json"), optional: true, reloadOnChange: false)
                 // allow overrides from the environment
                 .AddEnvironmentVariables()

@@ -18,7 +18,7 @@ static class Totp
     public const int StepSeconds = 30;
     public const int SecretLength = 20; // 160 bits, as RFC 4226 recommends
     public const string DefaultIssuer = "QSI USB/IP";
-    public const string IssuerKey = "usbipd:Otp:Issuer";
+    public const string IssuerKey = "qsiusbd:Otp:Issuer";
 
     /// <summary>
     /// Codes of the previous and the next step are also accepted, for clocks that are a little off.

@@ -29,7 +29,7 @@ public class Generator : IIncrementalGenerator
     const string DefaultXmlNs = "http://schemas.microsoft.com/win/2004/08/events"; // DevSkim: ignore DS137138
     const string WinXmlNs = "http://manifests.microsoft.com/win/2004/08/windows/events"; // DevSkim: ignore DS137138
 
-    const string ProviderName = "usbipd";
+    const string ProviderName = "qsiusbd";
     readonly string ProviderGuid;
 
     public Generator()

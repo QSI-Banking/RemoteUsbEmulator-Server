@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Usbipd.Data;
 
 /// <summary>
-/// 'usbipd db migrate': creates or upgrades the database schema and the database roles. Run it as an account that may change
+/// 'qsiusbd db migrate': creates or upgrades the database schema and the database roles. Run it as an account that may change
 /// the schema (or let a DBA run Database\usbipd.sql and Database\usbipd-roles.sql instead). The service never migrates the database itself.
 /// </summary>
 static class DatabaseCommands

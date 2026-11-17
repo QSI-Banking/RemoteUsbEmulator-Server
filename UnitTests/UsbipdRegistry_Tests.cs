@@ -13,7 +13,7 @@ sealed class UsbipdRegistry_Tests
 {
     static RegistryKey TestBaseKey = null!;
 
-    const string TestBaseKeyName = @"usbipd-win-tests-can-be-removed";
+    const string TestBaseKeyName = @"QSIUSBD-tests-can-be-removed";
 
     [ClassInitialize]
     public static void ClassInitialize(TestContext testContext)
@@ -39,19 +39,19 @@ sealed class UsbipdRegistry_Tests
 
         TestRegistryName = Guid.NewGuid().ToString("B");
         TestRegistry = TestBaseKey.CreateSubKey(TestRegistryName);
-        using var usbipdKey = TestRegistry.CreateSubKey(@"SOFTWARE\usbipd-win");
-        usbipdKey.SetValue("APPLICATIONFOLDER", AppDomain.CurrentDomain.BaseDirectory);
+        using var qsiusbdKey = TestRegistry.CreateSubKey(@"SOFTWARE\QSIUSBD");
+        qsiusbdKey.SetValue("APPLICATIONFOLDER", AppDomain.CurrentDomain.BaseDirectory);
 #pragma warning disable CS0436 // Type conflicts with imported type
-        usbipdKey.SetValue("Version", GitVersionInformation.MajorMinorPatch);
+        qsiusbdKey.SetValue("Version", GitVersionInformation.MajorMinorPatch);
 #pragma warning restore CS0436 // Type conflicts with imported type
-        using var devicesKey = usbipdKey.CreateSubKey("Devices");
+        using var devicesKey = qsiusbdKey.CreateSubKey("Devices");
         UsbipdRegistry.TestInstance?.Dispose();
         UsbipdRegistry.TestInstance = new(TestRegistry);
     }
 
     void SetUninstalled()
     {
-        TestRegistry.DeleteSubKeyTree(@"SOFTWARE\usbipd-win", false);
+        TestRegistry.DeleteSubKeyTree(@"SOFTWARE\QSIUSBD", false);
         UsbipdRegistry.TestInstance?.Dispose();
         UsbipdRegistry.TestInstance = new(TestRegistry);
     }
@@ -103,7 +103,7 @@ sealed class UsbipdRegistry_Tests
         var bound = UsbipdRegistry.Instance.GetBoundDevices();
 
         // Manually remove the InstanceId value from one of the devices.
-        TestRegistry.OpenSubKey($@"SOFTWARE\usbipd-win\Devices\{bound.First().PersistedGuid:B}", true)!.DeleteValue("InstanceId");
+        TestRegistry.OpenSubKey($@"SOFTWARE\QSIUSBD\Devices\{bound.First().PersistedGuid:B}", true)!.DeleteValue("InstanceId");
 
         Assert.HasCount(1, UsbipdRegistry.Instance.GetBoundDevices());
         Assert.DoesNotContain(d => d.PersistedGuid == bound.First().PersistedGuid, UsbipdRegistry.Instance.GetBoundDevices());
@@ -132,7 +132,7 @@ sealed class UsbipdRegistry_Tests
         var bound = UsbipdRegistry.Instance.GetBoundDevices();
 
         // Manually remove the InstanceId value from one of the devices.
-        TestRegistry.OpenSubKey($@"SOFTWARE\usbipd-win\Devices\{bound.First().PersistedGuid:B}", true)!.DeleteValue("Description");
+        TestRegistry.OpenSubKey($@"SOFTWARE\QSIUSBD\Devices\{bound.First().PersistedGuid:B}", true)!.DeleteValue("Description");
 
         Assert.HasCount(1, UsbipdRegistry.Instance.GetBoundDevices());
         Assert.DoesNotContain(d => d.PersistedGuid == bound.First().PersistedGuid, UsbipdRegistry.Instance.GetBoundDevices());
@@ -175,10 +175,10 @@ sealed class UsbipdRegistry_Tests
     [TestMethod]
     public void CountPolicyRules()
     {
-        // Policy rules are no longer supported; earlier versions' rules are only counted for 'usbipd db import-registry'.
+        // Policy rules are no longer supported; earlier versions' rules are only counted for 'qsiusbd db import-registry'.
         Assert.AreEqual(0, UsbipdRegistry.Instance.CountPolicyRules());
-        using (var usbipdKey = TestRegistry.OpenSubKey(@"SOFTWARE\usbipd-win", true)!)
-        using (var policyKey = usbipdKey.CreateSubKey("Policy"))
+        using (var qsiusbdKey = TestRegistry.OpenSubKey(@"SOFTWARE\QSIUSBD", true)!)
+        using (var policyKey = qsiusbdKey.CreateSubKey("Policy"))
         {
             policyKey.CreateSubKey(Guid.NewGuid().ToString("B")).Dispose();
             policyKey.CreateSubKey(Guid.NewGuid().ToString("B")).Dispose();
@@ -251,7 +251,7 @@ sealed class UsbipdRegistry_Tests
     [TestMethod]
     public void UserDevice_InvalidGuidIgnored()
     {
-        using (var userKey = TestRegistry.CreateSubKey(@"SOFTWARE\usbipd-win\Users\broken"))
+        using (var userKey = TestRegistry.CreateSubKey(@"SOFTWARE\QSIUSBD\Users\broken"))
         {
             userKey.SetValue("DeviceGuid", "not-a-guid");
         }

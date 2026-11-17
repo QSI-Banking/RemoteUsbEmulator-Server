@@ -66,7 +66,7 @@ static class BindStore
     }
 
     /// <summary>
-    /// Shares the device ('usbipd bind'); a no-op if it is already shared.
+    /// Shares the device ('qsiusbd bind'); a no-op if it is already shared.
     /// </summary>
     /// <returns>The bind GUID.</returns>
     public static Guid Persist(string instanceId, string description)
@@ -205,7 +205,7 @@ static class BindStore
     }
 
     /// <summary>
-    /// 'usbipd unbind'. Also ends its attachment (the service then detaches the device).
+    /// 'qsiusbd unbind'. Also ends its attachment (the service then detaches the device).
     /// </summary>
     public static void StopSharingDevice(Guid guid)
     {
@@ -222,7 +222,7 @@ static class BindStore
     }
 
     /// <summary>
-    /// 'usbipd unbind --all' for this server.
+    /// 'qsiusbd unbind --all' for this server.
     /// </summary>
     public static void StopSharingAllDevices()
     {
@@ -253,7 +253,7 @@ static class BindStore
     }
 
     /// <summary>
-    /// Deletes the attachment record. Done by the service after a detach, and by 'usbipd detach' to request one
+    /// Deletes the attachment record. Done by the service after a detach, and by 'qsiusbd detach' to request one
     /// (the service checks every few seconds, see <see cref="SessionMonitor"/>).
     /// </summary>
     /// <returns><see langword="false"/> if the device was not attached.</returns>

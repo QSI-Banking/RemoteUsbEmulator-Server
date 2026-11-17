@@ -5,7 +5,7 @@
 namespace UnitTests;
 
 [TestClass]
-sealed class Parse_usbipd_Tests
+sealed class Parse_qsiusbd_Tests
     : ParseTestBase
 {
     [TestMethod]

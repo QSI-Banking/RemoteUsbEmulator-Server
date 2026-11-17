@@ -51,11 +51,11 @@ public static class CustomActions
             if (path is not null && File.Exists(path))
             {
                 var root = new JavaScriptSerializer().DeserializeObject(File.ReadAllText(path)) as IDictionary<string, object>;
-                var tls = Child(Child(root, "usbipd"), "Tls");
+                var tls = Child(Child(root, "qsiusbd"), "Tls");
                 port = Text(Child(tls, "Port"));
                 server = Text(Child(tls, "ServerCertificateThumbprint"));
                 ca = Text(Child(tls, "ClientCaThumbprints"));
-                sessionMinutes = Text(Child(Child(Child(root, "usbipd"), "Session"), "MaxDurationMinutes"));
+                sessionMinutes = Text(Child(Child(Child(root, "qsiusbd"), "Session"), "MaxDurationMinutes"));
                 connectionString = Text(Child(Child(root, "ConnectionStrings"), "Usbipd"));
                 session.Log($"ReadTlsSettings: read {path}");
             }
@@ -70,7 +70,7 @@ public static class CustomActions
         SetIfEmpty(session, ClientCaProperty, ca);
         SetIfEmpty(session, SessionMaxMinutesProperty, string.IsNullOrWhiteSpace(sessionMinutes) ? DefaultSessionMaxMinutes : sessionMinutes);
 
-        // An empty SQL_SERVER keeps the connection string as it is (usbipd only replaces it when a server is given).
+        // An empty SQL_SERVER keeps the connection string as it is (qsiusbd only replaces it when a server is given).
         var (sqlServer, sqlDatabase, sqlTrust) = ParseConnectionString(session, connectionString);
         SetIfEmpty(session, SqlServerProperty, sqlServer);
         SetIfEmpty(session, SqlDatabaseProperty, string.IsNullOrWhiteSpace(sqlDatabase) ? DefaultSqlDatabase : sqlDatabase);

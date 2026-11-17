@@ -7,11 +7,11 @@ using System.Globalization;
 namespace Usbipd;
 
 /// <summary>
-/// Session limits from the "usbipd:Session" configuration section (appsettings.json next to usbipd.exe).
+/// Session limits from the "qsiusbd:Session" configuration section (appsettings.json next to qsiusbd.exe).
 /// </summary>
 sealed class SessionSettings
 {
-    public const string SectionName = "usbipd:Session";
+    public const string SectionName = "qsiusbd:Session";
     public static readonly TimeSpan DefaultMaxDuration = TimeSpan.FromMinutes(10);
     public static readonly TimeSpan DefaultImportTimeout = TimeSpan.FromSeconds(10);
     public static readonly TimeSpan DefaultRecheckInterval = TimeSpan.FromSeconds(2);

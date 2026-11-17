@@ -11,12 +11,12 @@ SPDX-License-Identifier: GPL-3.0-only
     >
     <Package
         ProductCode="$(var.ProductCode)"
-        Name="usbipd-win"
+        Name="QSIUSBD"
         Language="1033"
         Codepage="0"
         Version="$(var.GitVersion_MajorMinorPatch)"
         Manufacturer="QSI, Inc"
-        UpgradeCode="{EA1D5623-E6A7-4E4A-9259-E3972226646F}"
+        UpgradeCode="{767C5B1A-C31E-4CC2-856A-F19C90F183B1}"
         UpgradeStrategy="majorUpgrade"
         InstallerVersion="500"
         Compressed="yes"
@@ -57,9 +57,6 @@ SPDX-License-Identifier: GPL-3.0-only
             <?error Unsupported architecture. ?>
         <?endif?>
 
-        <Property Id="ARPURLINFOABOUT" Value="https://github.com/dorssel/usbipd-win" />
-        <Property Id="ARPURLUPDATEINFO" Value="https://github.com/dorssel/usbipd-win/releases" />
-        <Property Id="ARPHELPLINK" Value="https://github.com/dorssel/usbipd-win/issues" />
 
         <Property Id="MSIDEPLOYMENTCOMPLIANT" Value="1" />
 
@@ -86,7 +83,7 @@ SPDX-License-Identifier: GPL-3.0-only
         <Property Id="CURRENTINSTALLATIONLOCATION">
             <RegistrySearch Id="APPLICATIONFOLDER"
                             Root="HKLM"
-                            Key="SOFTWARE\usbipd-win"
+                            Key="SOFTWARE\QSIUSBD"
                             Name="APPLICATIONFOLDER"
                             Type="directory"
                             />
@@ -118,7 +115,7 @@ SPDX-License-Identifier: GPL-3.0-only
             Title="Server"
             Description="The user mode server application, installed as a service."
             >
-            <ComponentGroupRef Id="usbipd" />
+            <ComponentGroupRef Id="qsiusbd" />
             <ComponentGroupRef Id="UsbIds" />
             <Feature
                 Id="Drivers"
@@ -149,7 +146,7 @@ SPDX-License-Identifier: GPL-3.0-only
 
     <Fragment>
         <StandardDirectory Id="ProgramFiles64Folder">
-            <Directory Id="APPLICATIONFOLDER" Name="usbipd-win" />
+            <Directory Id="APPLICATIONFOLDER" Name="QSIUSBD" />
         </StandardDirectory>
     </Fragment>
 </Wix>

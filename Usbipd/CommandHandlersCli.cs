@@ -166,8 +166,8 @@ sealed partial class CommandHandlers : ICommandHandlers
         _ = console.CheckAndReportServerRunning(false);
         if (needsReview)
         {
-            console.ReportWarning("Devices that need a review or a bind cannot be attached: 'usbipd bind --review' confirms shared devices after " +
-                "a service start; a quarantined device (its bind was dropped when it was removed) needs 'usbipd bind' or 'usbipd unbind'.");
+            console.ReportWarning("Devices that need a review or a bind cannot be attached: 'qsiusbd bind --review' confirms shared devices after " +
+                "a service start; a quarantined device (its bind was dropped when it was removed) needs 'qsiusbd bind' or 'qsiusbd unbind'.");
         }
         return Task.FromResult(ExitCode.Success);
 #pragma warning restore CA1849 // Call async methods when in an async method
@@ -316,7 +316,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             Data.BindStore.StopSharingAllDevices();
             if (Data.UserStore.TryGetUsersOfDevice(null).Count > 0)
             {
-                console.ReportWarning("User mappings are kept; attach fails for those users until their devices are shared again. Use 'usbipd user list'.");
+                console.ReportWarning("User mappings are kept; attach fails for those users until their devices are shared again. Use 'qsiusbd user list'.");
             }
         }
         catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))

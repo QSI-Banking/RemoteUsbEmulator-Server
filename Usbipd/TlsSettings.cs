@@ -10,11 +10,11 @@ using System.Text;
 namespace Usbipd;
 
 /// <summary>
-/// TLS settings from the "usbipd:Tls" configuration section (appsettings.json next to usbipd.exe).
+/// TLS settings from the "qsiusbd:Tls" configuration section (appsettings.json next to qsiusbd.exe).
 /// </summary>
 sealed class TlsSettings
 {
-    public const string SectionName = "usbipd:Tls";
+    public const string SectionName = "qsiusbd:Tls";
     public const ushort DefaultPort = 3241;
     public static readonly TimeSpan DefaultHandshakeTimeout = TimeSpan.FromSeconds(10);
     static readonly char[] ListSeparators = [',', ';', ' ', '\t', '\r', '\n'];
@@ -68,7 +68,7 @@ sealed class TlsSettings
         {
             // Earlier versions; the allowed client certificates are now in the database.
             throw new InvalidOperationException(
-                $"{SectionName}:AllowedClientThumbprints is no longer used; add the client certificates with 'usbipd client add' " +
+                $"{SectionName}:AllowedClientThumbprints is no longer used; add the client certificates with 'qsiusbd client add' " +
                 "and remove the setting from appsettings.json.");
         }
         return settings;
@@ -84,7 +84,7 @@ sealed class TlsSettings
         if (string.IsNullOrWhiteSpace(value))
         {
             throw new InvalidOperationException(
-                $"{SectionName}:{key} is required; set it in appsettings.json next to usbipd.exe.");
+                $"{SectionName}:{key} is required; set it in appsettings.json next to qsiusbd.exe.");
         }
         var builder = new StringBuilder(40);
         foreach (var c in value)

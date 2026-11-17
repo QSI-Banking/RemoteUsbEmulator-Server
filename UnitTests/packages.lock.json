@@ -695,7 +695,7 @@
           "System.Diagnostics.EventLog": "10.0.14"
         }
       },
-      "usbipd": {
+      "qsiusbd": {
         "type": "Project",
         "dependencies": {
           "Microsoft.EntityFrameworkCore.SqlServer": "[10.0.14, )",

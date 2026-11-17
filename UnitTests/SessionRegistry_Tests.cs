@@ -54,9 +54,9 @@ sealed class SessionRegistry_Tests
     public void Settings_Values()
     {
         var settings = SessionSettings.Read(CreateConfiguration(
-            ("usbipd:Session:MaxDurationMinutes", "5"),
-            ("usbipd:Session:ImportTimeoutSeconds", "20"),
-            ("usbipd:Session:RecheckIntervalSeconds", "1")));
+            ("qsiusbd:Session:MaxDurationMinutes", "5"),
+            ("qsiusbd:Session:ImportTimeoutSeconds", "20"),
+            ("qsiusbd:Session:RecheckIntervalSeconds", "1")));
 
         Assert.AreEqual(TimeSpan.FromMinutes(5), settings.MaxDuration);
         Assert.AreEqual(TimeSpan.FromSeconds(20), settings.ImportTimeout);
@@ -70,7 +70,7 @@ sealed class SessionRegistry_Tests
     [DataRow("RecheckIntervalSeconds", "x")]
     public void Settings_Invalid(string key, string value)
     {
-        var configuration = CreateConfiguration(($"usbipd:Session:{key}", value));
+        var configuration = CreateConfiguration(($"qsiusbd:Session:{key}", value));
 
         _ = Assert.ThrowsExactly<InvalidOperationException>(() => SessionSettings.Read(configuration));
         Assert.AreEqual(SessionSettings.DefaultMaxDuration, SessionSettings.ReadOrDefault(configuration).MaxDuration);
@@ -209,7 +209,7 @@ sealed class SessionRegistry_Tests
         Assert.IsNull(alice.EndReason);
         Assert.IsNull(bob.EndReason);
 
-        // 'usbipd detach' deletes the record.
+        // 'qsiusbd detach' deletes the record.
         _ = map.Attached.Remove(Device1);
         monitor.CheckSessions();
         Assert.AreEqual("an administrator detached or unbound the device", alice.EndReason);
@@ -231,7 +231,7 @@ sealed class SessionRegistry_Tests
         monitor.CheckSessions();
         Assert.IsNull(alice.EndReason);
 
-        // 'usbipd client disable'
+        // 'qsiusbd client disable'
         _ = allowList.Allowed.Remove(ClientThumbprint);
         monitor.CheckSessions();
         Assert.AreEqual("the client certificate was disabled or removed", alice.EndReason);

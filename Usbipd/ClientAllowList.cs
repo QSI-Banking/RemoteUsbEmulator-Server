@@ -27,7 +27,7 @@ interface IClientAllowList
 }
 
 /// <summary>
-/// The enabled certificates of the ClientCertificates table ('usbipd client add'), shared by all servers.
+/// The enabled certificates of the ClientCertificates table ('qsiusbd client add'), shared by all servers.
 /// An empty list refuses every client.
 /// </summary>
 sealed class SqlClientAllowList(IConfiguration configuration) : IClientAllowList
@@ -75,7 +75,7 @@ sealed class SqlClientAllowList(IConfiguration configuration) : IClientAllowList
 }
 
 /// <summary>
-/// Refuses every client; for checking the TLS configuration without a database ('usbipd installer configure').
+/// Refuses every client; for checking the TLS configuration without a database ('qsiusbd installer configure').
 /// </summary>
 sealed class EmptyClientAllowList : IClientAllowList
 {

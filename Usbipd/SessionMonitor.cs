@@ -5,9 +5,9 @@
 namespace Usbipd;
 
 /// <summary>
-/// Revokes active sessions whose user was removed or mapped to another device ('usbipd user remove', 'usbipd user add --force'),
-/// whose attachment record was deleted ('usbipd detach', 'usbipd unbind'), or whose client certificate was disabled or removed
-/// ('usbipd client disable', 'usbipd client remove').
+/// Revokes active sessions whose user was removed or mapped to another device ('qsiusbd user remove', 'qsiusbd user add --force'),
+/// whose attachment record was deleted ('qsiusbd detach', 'qsiusbd unbind'), or whose client certificate was disabled or removed
+/// ('qsiusbd client disable', 'qsiusbd client remove').
 /// </summary>
 sealed class SessionMonitor(SessionRegistry sessionRegistry, IUserDeviceMap userDeviceMap, IClientAllowList allowList,
     ILogger<SessionMonitor> logger) : BackgroundService

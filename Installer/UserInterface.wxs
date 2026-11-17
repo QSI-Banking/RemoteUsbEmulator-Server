@@ -444,7 +444,7 @@ SPDX-License-Identifier: GPL-3.0-only
 
                 <Control
                     Id="Hint" Type="Text" X="30" Y="168" Width="310" Height="60" TabSkip="yes" NoPrefix="yes"
-                    Text="{\Caption}Example: .\SQLEXPRESS or sqlprod01. The service connects as NT AUTHORITY\SYSTEM (local SQL Server) or as this computer's domain account (remote). After installing, create the schema with: usbipd db migrate. Silent install: SQL_SERVER, SQL_DATABASE, SQL_TRUST_SERVER_CERT=1."
+                    Text="{\Caption}Example: .\SQLEXPRESS or sqlprod01. The service connects as NT AUTHORITY\SYSTEM (local SQL Server) or as this computer's domain account (remote). After installing, create the schema with: qsiusbd db migrate. Silent install: SQL_SERVER, SQL_DATABASE, SQL_TRUST_SERVER_CERT=1."
                     />
             </Dialog>
 

@@ -14,7 +14,7 @@ namespace Usbipd;
 
 /// <summary>
 /// Every change asks for an administrator's Windows credentials, so that an elevated window that was left open cannot be
-/// used by someone else. The check is valid for one command, or for an admin session ('usbipd admin') until it was idle for
+/// used by someone else. The check is valid for one command, or for an admin session ('qsiusbd admin') until it was idle for
 /// <see cref="SessionIdleTimeout"/> or lasted <see cref="SessionMaxDuration"/>; a timer then discards the sign-in token from memory.
 /// Database connections of the CLI are made as the checked account
 /// (see <see cref="Data.ImpersonatingConnectionInterceptor"/>), so the audit names the person who made the change.
@@ -35,7 +35,7 @@ static partial class AdminAuthorization
     static string? LockReason;
 
     /// <summary>
-    /// Set by 'usbipd admin' while its session runs; otherwise a check is valid for the current command only.
+    /// Set by 'qsiusbd admin' while its session runs; otherwise a check is valid for the current command only.
     /// </summary>
     public static bool InSession { get; set; }
 
@@ -110,7 +110,7 @@ static partial class AdminAuthorization
         }
 
         var message = InSession
-            ? "Enter the credentials of a local administrator for this usbipd admin session."
+            ? "Enter the credentials of a local administrator for this qsiusbd admin session."
             : "Enter the credentials of a local administrator to make this change.";
         uint authError = 0;
         for (var attempt = 0; attempt < MaxAttempts; ++attempt)
@@ -286,7 +286,7 @@ static partial class AdminAuthorization
         userName = string.Empty;
         domain = string.Empty;
         password = [];
-        fixed (char* caption = "usbipd")
+        fixed (char* caption = "qsiusbd")
         fixed (char* text = message)
         {
             var info = new CREDUI_INFOW

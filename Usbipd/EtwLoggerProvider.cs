@@ -14,7 +14,7 @@ sealed class EtwLoggerProvider : ILoggerProvider
 
     public EtwLoggerProvider()
     {
-        // The GUID is derived from the provider name "usbipd" using the algorithm described in
+        // The GUID is derived from the provider name "qsiusbd" using the algorithm described in
         // https://learn.microsoft.com/en-us/windows/win32/etw/guid-generation-algorithm
 
         unsafe // DevSkim: ignore DS172412

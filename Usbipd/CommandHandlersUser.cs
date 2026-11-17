@@ -28,7 +28,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             device = Data.BindStore.GetBoundDevices().SingleOrDefault(d => d.PersistedGuid == guid.Value);
             if (device is null)
             {
-                console.ReportError($"There is no shared device with guid '{guid.Value:D}'; run 'usbipd bind' as administrator first.");
+                console.ReportError($"There is no shared device with guid '{guid.Value:D}'; run 'qsiusbd bind' as administrator first.");
                 return ExitCode.Failure;
             }
         }
@@ -37,7 +37,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             device = Data.BindStore.GetBoundDevices().SingleOrDefault(d => d.BusId.HasValue && d.BusId.Value == busId.Value);
             if (device is null)
             {
-                console.ReportError($"There is no shared device with busid '{busId.Value}'; run 'usbipd bind --busid {busId.Value}' as administrator first.");
+                console.ReportError($"There is no shared device with busid '{busId.Value}'; run 'qsiusbd bind --busid {busId.Value}' as administrator first.");
                 return ExitCode.Failure;
             }
         }
@@ -79,7 +79,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             }
             else if (!hasSecret)
             {
-                console.ReportWarning($"User '{user.Name}' has no one-time password secret yet; run 'usbipd user otp reset --name {user.Name}' in an interactive console.");
+                console.ReportWarning($"User '{user.Name}' has no one-time password secret yet; run 'qsiusbd user otp reset --name {user.Name}' in an interactive console.");
             }
 
             console.ReportInfo($"User '{user.Name}' mapped to '{device.Description}' ({device.InstanceId}).");
@@ -97,7 +97,7 @@ sealed partial class CommandHandlers : ICommandHandlers
     }
 
     /// <summary>
-    /// 'usbipd user otp reset': a new TOTP secret for an existing user; codes from the old secret stop working.
+    /// 'qsiusbd user otp reset': a new TOTP secret for an existing user; codes from the old secret stop working.
     /// </summary>
     async Task<ExitCode> ICommandHandlers.UserOtpReset(string userName, IConsole console, CancellationToken cancellationToken)
     {
@@ -123,7 +123,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             var user = await UserStore.FindUserAsync(db, userName, cancellationToken);
             if (user is null)
             {
-                console.ReportError($"There is no user '{userName}'; add the user first with 'usbipd user add'.");
+                console.ReportError($"There is no user '{userName}'; add the user first with 'qsiusbd user add'.");
                 return ExitCode.Failure;
             }
             using var certificate = Data.OtpCertificate.Load(Data.Database.LoadConfiguration());
@@ -249,7 +249,7 @@ sealed partial class CommandHandlers : ICommandHandlers
     }
 
     /// <summary>
-    /// 'usbipd user otp status': which certificates the OTP secrets are encrypted to, for a rotation.
+    /// 'qsiusbd user otp status': which certificates the OTP secrets are encrypted to, for a rotation.
     /// </summary>
     async Task<ExitCode> ICommandHandlers.UserOtpStatus(IConsole console, CancellationToken cancellationToken)
     {
@@ -381,7 +381,7 @@ sealed partial class CommandHandlers : ICommandHandlers
     }
 
     /// <summary>
-    /// One-time move of what earlier versions kept in the registry (HKLM\SOFTWARE\usbipd-win): binds and users.
+    /// One-time move of what earlier versions kept in the registry (HKLM\SOFTWARE\QSIUSBD): binds and users.
     /// Policy rules are no longer supported; they are skipped with a note.
     /// Binds keep their GUID. Imported entries are removed from the registry; entries that conflict with the database are kept
     /// (with a warning) and the database is not changed for them.
@@ -403,7 +403,7 @@ sealed partial class CommandHandlers : ICommandHandlers
         if (registryRuleCount > 0)
         {
             console.ReportWarning($"{registryRuleCount} policy rule(s) in the registry are skipped: policy rules are no longer supported. " +
-                "Share devices with 'usbipd bind' instead.");
+                "Share devices with 'qsiusbd bind' instead.");
         }
         var registryUsers = UsbipdRegistry.Instance.GetUserDevices();
         if (registryDevices.Count == 0 && registryUsers.Count == 0)
@@ -492,7 +492,7 @@ sealed partial class CommandHandlers : ICommandHandlers
     {
         foreach (var userName in UserStore.TryGetUsersOfDevice(instanceId))
         {
-            console.ReportWarning($"User '{userName}' is still mapped to this device; attach fails until it is shared again, or run 'usbipd user remove --name {userName}'.");
+            console.ReportWarning($"User '{userName}' is still mapped to this device; attach fails until it is shared again, or run 'qsiusbd user remove --name {userName}'.");
         }
     }
 }

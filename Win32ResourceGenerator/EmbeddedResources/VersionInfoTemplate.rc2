@@ -25,9 +25,9 @@ BEGIN
             VALUE "CompanyName", "{{CompanyName}}"
             VALUE "FileDescription", "Utility for sharing locally connected USB devices to other machines"
             VALUE "FileVersion", "{{FileVersion}}"
-            VALUE "InternalName", "usbipd"
+            VALUE "InternalName", "qsiusbd"
             VALUE "LegalCopyright", "{{LegalCopyright}}"
-            VALUE "OriginalFilename", "usbipd.exe"
+            VALUE "OriginalFilename", "qsiusbd.exe"
             VALUE "ProductName", "{{ProductName}}"
             VALUE "ProductVersion", "{{ProductVersion}}"
             {{OptionalPrivateBuild}}

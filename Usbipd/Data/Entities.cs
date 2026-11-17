@@ -79,13 +79,13 @@ sealed class Device
     public DateTime CreatedUtc { get; set; }
 
     /// <summary>
-    /// Set while the device is shared ('usbipd bind').
+    /// Set while the device is shared ('qsiusbd bind').
     /// </summary>
     public Bind? Bind { get; set; }
 }
 
 /// <summary>
-/// A shared device ('usbipd bind'). Unbind deletes the row; a rebind gets a new GUID.
+/// A shared device ('qsiusbd bind'). Unbind deletes the row; a rebind gets a new GUID.
 /// <para>
 /// A bind is only valid while the service has watched the device without a break since an administrator confirmed it:
 /// <see cref="ConfirmedRunId"/> must be the current run of the service (see <see cref="ServerRun"/>), and the service
@@ -95,7 +95,7 @@ sealed class Device
 sealed class Bind
 {
     /// <summary>
-    /// The bind GUID shown by 'usbipd list' (persisted GUID).
+    /// The bind GUID shown by 'qsiusbd list' (persisted GUID).
     /// </summary>
     public Guid Id { get; set; }
 
@@ -128,7 +128,7 @@ sealed class Bind
     public DateTime? ArrivedUtc { get; set; }
 
     /// <summary>
-    /// The run of the service in which an administrator confirmed the bind ('usbipd bind', 'usbipd bind --review').
+    /// The run of the service in which an administrator confirmed the bind ('qsiusbd bind', 'qsiusbd bind --review').
     /// </summary>
     public Guid? ConfirmedRunId { get; set; }
 
@@ -151,7 +151,7 @@ sealed class ServerRun
 
 /// <summary>
 /// A shared device that is attached to a client right now. Written by the service; deleting the row
-/// ('usbipd detach') makes the service detach the device.
+/// ('qsiusbd detach') makes the service detach the device.
 /// </summary>
 sealed class Attachment
 {
@@ -174,8 +174,8 @@ sealed class Attachment
 }
 
 /// <summary>
-/// A client certificate that may connect ('usbipd client add'). The list is shared by all servers.
-/// A certificate must also be issued by a CA in usbipd:Tls:ClientCaThumbprints.
+/// A client certificate that may connect ('qsiusbd client add'). The list is shared by all servers.
+/// A certificate must also be issued by a CA in qsiusbd:Tls:ClientCaThumbprints.
 /// </summary>
 sealed class ClientCertificate
 {

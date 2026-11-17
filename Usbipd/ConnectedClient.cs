@@ -407,7 +407,7 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
             Logger.ClientAttach(ClientContext.ClientAddress, busId, device.InstanceId);
             try
             {
-                // Recorded for 'usbipd list' and 'usbipd detach'; no attach without the record.
+                // Recorded for 'qsiusbd list' and 'qsiusbd detach'; no attach without the record.
                 Data.BindStore.SetDeviceAsAttached(device.PersistedGuid.Value, device.BusId.Value, ClientContext.ClientAddress,
                     vboxDevice.InstanceId, ClientContext.AuthenticatedUser);
                 session.MarkRecorded();
@@ -459,7 +459,7 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
                         .ThrowOnError(nameof(PInvoke.CM_Register_Notification));
                 }
 
-                // Unbind and 'usbipd detach' delete the attachment record; SessionMonitor then revokes the session.
+                // Unbind and 'qsiusbd detach' delete the attachment record; SessionMonitor then revokes the session.
                 session.StartClock(SessionRegistry.Settings.MaxDuration);
                 await ServiceProvider.GetRequiredService<AttachedClient>().RunAsync(attachedClientTokenSource.Token);
             }
@@ -473,7 +473,7 @@ sealed class ConnectedClient(ILogger<ConnectedClient> logger, ClientContext clie
                 }
                 catch (Exception ex) when (Data.UserStore.IsDatabaseError(ex))
                 {
-                    // Cleared at the next service start; 'usbipd list' ignores it once the service is stopped.
+                    // Cleared at the next service start; 'qsiusbd list' ignores it once the service is stopped.
                     Logger.AttachmentRecordNotCleared(ex.Message);
                 }
 

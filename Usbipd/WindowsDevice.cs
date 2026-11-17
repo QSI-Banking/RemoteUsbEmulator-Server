@@ -118,7 +118,7 @@ sealed partial class WindowsDevice : IEquatable<WindowsDevice>
     /// <summary>
     /// Appended to the name Device Manager shows for a device on the VBoxUSB driver; never part of <see cref="Description"/>.
     /// </summary>
-    public const string SharedNameNote = " (shared by usbipd)";
+    public const string SharedNameNote = " (shared by qsiusbd)";
 
 
     /// <summary>
@@ -217,7 +217,7 @@ sealed partial class WindowsDevice : IEquatable<WindowsDevice>
     }
 
     /// <summary>
-    /// The name Device Manager shows for a shared device: the real product, with a note that usbipd shares it.
+    /// The name Device Manager shows for a shared device: the real product, with a note that qsiusbd shares it.
     /// </summary>
     /// <returns>true on success.</returns>
     public bool SetFriendlyName()

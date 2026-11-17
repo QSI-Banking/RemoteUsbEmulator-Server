@@ -7,7 +7,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace Usbipd;
 
 /// <summary>
-/// Rules for user names used by `usbipd user` and by OP_REQ_AUTH.
+/// Rules for user names used by `qsiusbd user` and by OP_REQ_AUTH.
 /// </summary>
 static class UserNames
 {

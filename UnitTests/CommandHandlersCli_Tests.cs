@@ -13,7 +13,7 @@ sealed class CommandHandlersCli_Tests
 {
     static RegistryKey TestBaseKey = null!;
 
-    const string TestBaseKeyName = @"usbipd-win-tests-can-be-removed";
+    const string TestBaseKeyName = @"QSIUSBD-tests-can-be-removed";
 
     [ClassInitialize]
     public static void ClassInitialize(TestContext testContext)
@@ -39,12 +39,12 @@ sealed class CommandHandlersCli_Tests
 
         TestRegistryName = Guid.NewGuid().ToString("B");
         TestRegistry = TestBaseKey.CreateSubKey(TestRegistryName);
-        using var usbipdKey = TestRegistry.CreateSubKey(@"SOFTWARE\usbipd-win");
-        usbipdKey.SetValue("APPLICATIONFOLDER", AppDomain.CurrentDomain.BaseDirectory);
+        using var qsiusbdKey = TestRegistry.CreateSubKey(@"SOFTWARE\QSIUSBD");
+        qsiusbdKey.SetValue("APPLICATIONFOLDER", AppDomain.CurrentDomain.BaseDirectory);
 #pragma warning disable CS0436 // Type conflicts with imported type
-        usbipdKey.SetValue("Version", GitVersionInformation.MajorMinorPatch);
+        qsiusbdKey.SetValue("Version", GitVersionInformation.MajorMinorPatch);
 #pragma warning restore CS0436 // Type conflicts with imported type
-        using var devicesKey = usbipdKey.CreateSubKey("Devices");
+        using var devicesKey = qsiusbdKey.CreateSubKey("Devices");
         UsbipdRegistry.TestInstance?.Dispose();
         UsbipdRegistry.TestInstance = new(TestRegistry);
     }

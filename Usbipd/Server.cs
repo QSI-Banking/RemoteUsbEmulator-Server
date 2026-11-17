@@ -14,7 +14,7 @@ namespace Usbipd;
 
 sealed partial class Server : BackgroundService
 {
-    public const string SingletonMutexName = @"Global\usbipd-{A8256F62-728F-49B0-82BB-E5E48F83D28F}";
+    public const string SingletonMutexName = @"Global\qsiusbd-{A8256F62-728F-49B0-82BB-E5E48F83D28F}";
 
     public Server(ILogger<Server> logger, IConfiguration config, IServiceScopeFactory serviceScopeFactory, IClientAllowList allowList, PcapNg _)
     {

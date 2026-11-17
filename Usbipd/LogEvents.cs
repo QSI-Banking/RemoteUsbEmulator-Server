@@ -85,13 +85,13 @@ static partial class LogEvents
     [LoggerMessage(25, LogLevel.Warning, "Device {instanceId} was removed; its bind {guid} is dropped. Bind the device again to share it.")]
     public static partial void BindDropped(this ILogger logger, string instanceId, Guid guid);
 
-    [LoggerMessage(26, LogLevel.Warning, "{count} shared device(s) need a review since the service started; attaches to them are refused until an administrator runs 'usbipd bind --review'.")]
+    [LoggerMessage(26, LogLevel.Warning, "{count} shared device(s) need a review since the service started; attaches to them are refused until an administrator runs 'qsiusbd bind --review'.")]
     public static partial void BindsNeedReview(this ILogger logger, int count);
 
     [LoggerMessage(27, LogLevel.Warning, "Shared devices cannot be watched or updated in the database: {reason}")]
     public static partial void BindWatchFailed(this ILogger logger, string reason);
 
-    [LoggerMessage(29, LogLevel.Warning, "The one-time password secret of user '{userName}' cannot be decrypted: {reason}. The user needs 'usbipd user otp reset'.")]
+    [LoggerMessage(29, LogLevel.Warning, "The one-time password secret of user '{userName}' cannot be decrypted: {reason}. The user needs 'qsiusbd user otp reset'.")]
     public static partial void OtpSecretUnreadable(this ILogger logger, string userName, string reason);
 
     [LoggerMessage(30, LogLevel.Information, "The one-time password secret of user id {userId} was re-encrypted from certificate {oldThumbprint} to {newThumbprint}.")]

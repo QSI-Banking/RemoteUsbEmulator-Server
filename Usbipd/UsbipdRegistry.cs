@@ -11,8 +11,8 @@ using Usbipd.Automation;
 namespace Usbipd;
 
 /// <summary>
-/// The registry state of earlier versions (HKLM\SOFTWARE\usbipd-win). Binds, attachments and users are now in
-/// SQL Server (see <see cref="Data.BindStore"/> and <see cref="Data.UserStore"/>); this is only read by 'usbipd db import-registry'.
+/// The registry state of earlier versions (HKLM\SOFTWARE\QSIUSBD). Binds, attachments and users are now in
+/// SQL Server (see <see cref="Data.BindStore"/> and <see cref="Data.UserStore"/>); this is only read by 'qsiusbd db import-registry'.
 /// The installer still records the installation folder here.
 /// </summary>
 sealed class UsbipdRegistry : IDisposable
@@ -32,7 +32,7 @@ sealed class UsbipdRegistry : IDisposable
         WritableBaseKey?.Dispose();
     }
 
-    const string RegistryPath = @"SOFTWARE\usbipd-win";
+    const string RegistryPath = @"SOFTWARE\QSIUSBD";
 
     public UsbipdRegistry(RegistryKey parentKey)
     {
@@ -83,7 +83,7 @@ sealed class UsbipdRegistry : IDisposable
     }
 
     /// <summary>
-    /// Policy rules are no longer supported; only counted so that 'usbipd db import-registry' can say they are skipped.
+    /// Policy rules are no longer supported; only counted so that 'qsiusbd db import-registry' can say they are skipped.
     /// </summary>
     public int CountPolicyRules()
     {
@@ -220,7 +220,7 @@ sealed class UsbipdRegistry : IDisposable
 
     /// <summary>
     /// Maps a user (see <see cref="UserNames"/>) to the bind GUID of the device that user may attach.
-    /// Stored as HKLM\SOFTWARE\usbipd-win\Users\&lt;name&gt;\DeviceGuid. Replaces any existing mapping.
+    /// Stored as HKLM\SOFTWARE\QSIUSBD\Users\&lt;name&gt;\DeviceGuid. Replaces any existing mapping.
     /// </summary>
     public void SetUserDevice(string userName, Guid deviceGuid)
     {

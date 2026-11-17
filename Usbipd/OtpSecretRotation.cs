@@ -12,7 +12,7 @@ namespace Usbipd;
 /// <summary>
 /// Certificate rotation for OTP secrets: re-encrypts every secret that is not yet encrypted to the current certificate
 /// (see <see cref="OtpCertificate"/>), once at every service start. Needs the private key of the old certificate;
-/// a secret whose certificate is gone cannot be recovered and the user needs 'usbipd user otp reset'.
+/// a secret whose certificate is gone cannot be recovered and the user needs 'qsiusbd user otp reset'.
 /// </summary>
 sealed class OtpSecretRotation(IConfiguration configuration, ILogger<OtpSecretRotation> logger) : BackgroundService
 {

@@ -48,11 +48,11 @@ public class GetUsbipdDeviceCommand : Cmdlet
 
         if (process.ExitCode != 0)
         {
-            throw new ApplicationFailedException($"usbipd failed with exit code {process.ExitCode}.");
+            throw new ApplicationFailedException($"qsiusbd failed with exit code {process.ExitCode}.");
         }
         if (!string.IsNullOrEmpty(stderr))
         {
-            throw new ApplicationFailedException($"usbipd returned unexpected error text:\n\n{stderr}");
+            throw new ApplicationFailedException($"qsiusbd returned unexpected error text:\n\n{stderr}");
         }
 
         WriteDebug(stdout);

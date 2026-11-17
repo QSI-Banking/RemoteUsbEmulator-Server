@@ -18,7 +18,7 @@ SPDX-License-Identifier: GPL-3.0-only
     <IsPublishable>true</IsPublishable>
     <!--
     Not Native AOT: EF Core and SqlClient (the user database) do not fully support it.
-    Still one usbipd.exe: self-contained single file, so the installer and the PATH stay as they are.
+    Still one qsiusbd.exe: self-contained single file, so the installer and the PATH stay as they are.
     -->
     <PublishAot>false</PublishAot>
     <IsAotCompatible>false</IsAotCompatible>
@@ -30,7 +30,7 @@ SPDX-License-Identifier: GPL-3.0-only
     <InvariantGlobalization>false</InvariantGlobalization>
     <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
 
-    <AssemblyName>usbipd</AssemblyName>
+    <AssemblyName>qsiusbd</AssemblyName>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(EfDesign)' == 'true'">
@@ -82,7 +82,7 @@ SPDX-License-Identifier: GPL-3.0-only
 
   <ItemGroup>
     <!--
-    Design-time only (dotnet ef), so Roslyn does not end up in usbipd.exe. Set the environment variable EfDesign=true
+    Design-time only (dotnet ef), so Roslyn does not end up in qsiusbd.exe. Set the environment variable EfDesign=true
     before running dotnet ef (see Data\Database.cs).
     -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" Condition="'$(EfDesign)' == 'true'" />
@@ -113,10 +113,11 @@ SPDX-License-Identifier: GPL-3.0-only
   <ItemGroup>
     <!-- Drivers -->
     <!-- Copy everything at the top level only, except the REUSE .license files (if any). -->
-    <Content Include="..\Drivers\*" Link="Drivers\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <!-- ExcludeFromSingleFile: the .sys files are native binaries, which the single-file publish would otherwise pack into qsiusbd.exe. -->
+    <Content Include="..\Drivers\*" Link="Drivers\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <Content Remove="..\Drivers\*.license" />
     <!-- Also copy everything in the platform directory moving it to the top level, except the REUSE .license files (if any). -->
-    <Content Include="..\Drivers\$(Platform)\*" Link="Drivers\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\Drivers\$(Platform)\*" Link="Drivers\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <Content Remove="..\Drivers\$(Platform)\*.license" />
   </ItemGroup>
 

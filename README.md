@@ -5,7 +5,7 @@ SPDX-FileCopyrightText: 2026 QSI Banking
 SPDX-License-Identifier: GPL-3.0-only
 -->
 
-# Remote USB server (usbipd)
+# Remote USB server (qsiusbd)
 
 Shares USB devices plugged into a Windows server, such as license dongles, with authenticated Windows clients.
 Every connection uses mutual TLS. Each user is mapped to one device and signs in with a code from an authenticator app (TOTP).
@@ -16,7 +16,7 @@ The client is the [RemoteUsbEmulator-Client](https://github.com/QSI-Banking/Remo
 ```mermaid
 sequenceDiagram
     participant C as Client PC
-    participant S as Server (usbipd service)
+    participant S as Server (qsiusbd service)
     participant D as SQL Server
     C->>S: TLS handshake, both sides present certificates
     S->>D: client certificate allowed?
@@ -27,7 +27,7 @@ sequenceDiagram
 ```
 
 - **SQL Server** holds binds, users, OTP secrets, allowed client certificates, attachments and the audit log.
-- **`appsettings.json`** (next to `usbipd.exe`) holds the TLS port and certificates, the session limits and the connection string.
+- **`appsettings.json`** (next to `qsiusbd.exe`) holds the TLS port and certificates, the session limits and the connection string.
 - A shared device is **bound** to the VBoxUSB driver, so the server itself cannot use it.
 
 ## Requirements
@@ -63,7 +63,7 @@ $client = New-SelfSignedCertificate -Subject 'CN=usbip-dev-client, O=USBIP Devel
 $password = Read-Host -AsSecureString 'Password for the client .pfx'
 Export-PfxCertificate -Cert $client -FilePath .\usbip-dev-client.pfx -Password $password
 Remove-Item "Cert:\LocalMachine\My\$($client.Thumbprint)"
-$client.Thumbprint   # for 'usbipd client add'
+$client.Thumbprint   # for 'qsiusbd client add'
 ```
 
 On the client PC, import `usbip-dev-ca.cer` into Local Computer > Trusted Root and `usbip-dev-client.pfx` into
@@ -73,7 +73,7 @@ Local Computer > Personal.
 
 ## Install
 
-Run `usbipd-win_<version>_x64.msi` as an administrator. Its pages:
+Run `QSIUSBD_<version>_x64.msi` as an administrator. Its pages:
 
 | Page | Field | Notes |
 |---|---|---|
@@ -84,68 +84,68 @@ Run `usbipd-win_<version>_x64.msi` as an administrator. Its pages:
 | Database | SQL Server, Database | For example `.\SQLEXPRESS` and `usbipd`. |
 | | Trust the SQL Server certificate | Development only. |
 
-Silent install: `msiexec /i usbipd-win_<version>_x64.msi /qn TLS_PORT=3241 TLS_SERVER_CERT=<thumbprint> TLS_CLIENT_CA=<thumbprint> SESSION_MAX_MINUTES=10 SQL_SERVER=.\SQLEXPRESS SQL_DATABASE=usbipd SQL_TRUST_SERVER_CERT=0`
+Silent install: `msiexec /i QSIUSBD_<version>_x64.msi /qn TLS_PORT=3241 TLS_SERVER_CERT=<thumbprint> TLS_CLIENT_CA=<thumbprint> SESSION_MAX_MINUTES=10 SQL_SERVER=.\SQLEXPRESS SQL_DATABASE=qsiusbd SQL_TRUST_SERVER_CERT=0`
 
 To change settings later, edit `appsettings.json` and restart the service, or uninstall and install again.
 
 ## Initial setup
 
 Run these in an elevated PowerShell. Every command that changes something shows a Windows sign-in dialog for a
-local administrator; `usbipd admin` signs in once for several commands.
+local administrator; `qsiusbd admin` signs in once for several commands.
 
 1. **Create the database**, as an account that may change the schema:
-   `usbipd db migrate`
+   `qsiusbd db migrate`
 2. **Give SQL access**, in SQL Server (for example with `sqlcmd`):
    ```sql
    ALTER ROLE usbipd_service ADD MEMBER [NT AUTHORITY\SYSTEM];   -- or [DOMAIN\SERVER$] for a remote SQL Server
-   ALTER ROLE usbipd_admin ADD MEMBER [DOMAIN\usbipd-admins];    -- the administrators who run usbipd
+   ALTER ROLE usbipd_admin ADD MEMBER [DOMAIN\usbipd-admins];    -- the administrators who run qsiusbd
    ```
    Grant `usbipd_admin` to the administrators' accounts or groups directly, not through `BUILTIN\Administrators`.
 3. **Allow the client certificates**:
-   `usbipd client add --certificate C:\certs\pc42.cer --name PC42` (or `--thumbprint <SHA-1>`)
-4. **Share devices**: `usbipd list`, then `usbipd bind --busid <BUSID>`.
-5. **Add users**: `usbipd user add --name alice --busid <BUSID>`. A QR code is shown once; scan it with the user's
+   `qsiusbd client add --certificate C:\certs\pc42.cer --name PC42` (or `--thumbprint <SHA-1>`)
+4. **Share devices**: `qsiusbd list`, then `qsiusbd bind --busid <BUSID>`.
+5. **Add users**: `qsiusbd user add --name alice --busid <BUSID>`. A QR code is shown once; scan it with the user's
    authenticator app (Microsoft Authenticator, Google Authenticator and others).
-6. **Check**: `usbipd list`, `usbipd user list`, `usbipd client list`, then attach from a client.
+6. **Check**: `qsiusbd list`, `qsiusbd user list`, `qsiusbd client list`, then attach from a client.
 
 ## Ongoing use
 
 | Task | Command |
 |---|---|
-| After every service start (also after a reboot) | `usbipd bind --review` |
-| Several changes with one sign-in | `usbipd admin` |
-| Share a device / stop sharing | `usbipd bind --busid <BUSID>` / `usbipd unbind --busid <BUSID>` |
-| Add a user or move them to another device | `usbipd user add --name <NAME> --busid <BUSID> [--force]` |
-| Remove a user | `usbipd user remove --name <NAME>` |
-| Lost or new phone | `usbipd user otp reset --name <NAME>` |
-| Allow, disable or remove a client PC | `usbipd client add / disable / enable / remove` |
-| End a session now | `usbipd detach --busid <BUSID>` |
-| See devices, users, clients | `usbipd list`, `usbipd user list`, `usbipd client list` |
+| After every service start (also after a reboot) | `qsiusbd bind --review` |
+| Several changes with one sign-in | `qsiusbd admin` |
+| Share a device / stop sharing | `qsiusbd bind --busid <BUSID>` / `qsiusbd unbind --busid <BUSID>` |
+| Add a user or move them to another device | `qsiusbd user add --name <NAME> --busid <BUSID> [--force]` |
+| Remove a user | `qsiusbd user remove --name <NAME>` |
+| Lost or new phone | `qsiusbd user otp reset --name <NAME>` |
+| Allow, disable or remove a client PC | `qsiusbd client add / disable / enable / remove` |
+| End a session now | `qsiusbd detach --busid <BUSID>` |
+| See devices, users, clients | `qsiusbd list`, `qsiusbd user list`, `qsiusbd client list` |
 | Rotate the OTP certificate | See below |
 
 **Rotating the certificate of the OTP secrets** (for example when the server certificate is renewed):
 
 1. Install the new certificate in Local Computer > Personal, with a private key the service can use.
-2. Point `usbipd:Otp:CertificateThumbprint` (or the TLS server certificate, if the setting is empty) to it and
+2. Point `qsiusbd:Otp:CertificateThumbprint` (or the TLS server certificate, if the setting is empty) to it and
    restart the service. **Keep the old certificate installed.**
 3. The service re-encrypts every secret to the new certificate when it starts.
-4. When `usbipd user otp status` shows no secrets on the old certificate, remove it.
+4. When `qsiusbd user otp status` shows no secrets on the old certificate, remove it.
 
-If a certificate is removed too early, the secrets on it are lost: those users need `usbipd user otp reset`.
+If a certificate is removed too early, the secrets on it are lost: those users need `qsiusbd user otp reset`.
 
-Device states in `usbipd list`:
+Device states in `qsiusbd list`:
 
 - **Shared**: can be attached.
-- **Needs review**: the service restarted since the bind was confirmed; run `usbipd bind --review`.
+- **Needs review**: the service restarted since the bind was confirmed; run `qsiusbd bind --review`.
 - **Quarantined**: the device was unplugged, moved or re-enumerated, so its bind was dropped. It stays on the VBoxUSB
-  driver. Run `usbipd bind` to share it again after checking it is the right device, or `usbipd unbind` to give it
+  driver. Run `qsiusbd bind` to share it again after checking it is the right device, or `qsiusbd unbind` to give it
   back to Windows.
 - **Needs bind (driver lost)**: the device is no longer on the VBoxUSB driver; unbind and bind it again.
 
 ## Security
 
 - **Mutual TLS** on every connection. A client needs a certificate from the configured CA that is also enabled in
-  `usbipd client list`. Disabling or removing a certificate ends its sessions within seconds.
+  `qsiusbd client list`. Disabling or removing a certificate ends its sessions within seconds.
 - **Users** sign in with a 6-digit TOTP code; each code works once. A user can only attach the one device mapped to them.
 - **Sessions** end at the time limit, when an administrator detaches, unbinds or remaps, removes the user, or disables
   the client certificate. Clients never reconnect by themselves; a new session needs a new code.
@@ -156,12 +156,12 @@ Device states in `usbipd list`:
   database connection runs as that person, and every change is written to `usbipd.AdminAudit`.
 - **OTP secrets** are encrypted with the ConfigEncrypt library's RSA certificate format (stored as `enc:` + Base64;
   AES-256-GCM, key wrapped with the certificate's RSA key) to the TLS server certificate, or to
-  `usbipd:Otp:CertificateThumbprint`. Administrators encrypt with the public key; only the
+  `qsiusbd:Otp:CertificateThumbprint`. Administrators encrypt with the public key; only the
   service, which has the private key, can decrypt. Each secret only decrypts for its own user.
 - **Connections**: at most 100 at a time; one that does not sign in within `ImportTimeoutSeconds` is closed. A refused
   sign-in always takes one second, whether the user is unknown or the code is wrong.
 - **Wrong codes**: three wrong one-time codes for a user within a minute drop the bind of that user's device (and end
-  its session). No more codes can be tried until an administrator runs `usbipd bind` for the device again.
+  its session). No more codes can be tried until an administrator runs `qsiusbd bind` for the device again.
 - **No attaches** while the database cannot be reached.
 
 Known limits:
@@ -175,49 +175,51 @@ Known limits:
 | The client says | Meaning | What to do |
 |---|---|---|
 | Authentication failed | Unknown user, wrong code, or a code that was already used | Wait for the next code; check the phone's clock |
-| No device is bound to user | The user is not mapped to a device on this server | `usbipd user add` |
-| Cannot be attached until an administrator checks it | Needs review, quarantined, not shared, or not present | `usbipd list`, then `bind --review` or `bind` |
+| No device is bound to user | The user is not mapped to a device on this server | `qsiusbd user add` |
+| Cannot be attached until an administrator checks it | Needs review, quarantined, not shared, or not present | `qsiusbd list`, then `bind --review` or `bind` |
 | Server unavailable | The service cannot reach SQL Server | Check SQL Server and the service's SQL access |
-| Device busy | Another session holds the device | `usbipd detach` if needed |
-| Connection or TLS failure | Certificate not allowed, wrong server name or pin, port blocked | `usbipd client list`; check the client's settings |
+| Device busy | Another session holds the device | `qsiusbd detach` if needed |
+| Connection or TLS failure | Certificate not allowed, wrong server name or pin, port blocked | `qsiusbd client list`; check the client's settings |
 
-The service log explains every refusal. It is in Event Viewer under **Applications and Services Logs > usbipd >
+The service log explains every refusal. It is in Event Viewer under **Applications and Services Logs > qsiusbd >
 Operational**, or in PowerShell:
 
 ```powershell
-Get-WinEvent -LogName usbipd/Operational -MaxEvents 30 | Format-Table TimeCreated, Id, LevelDisplayName, Message -Wrap
+Get-WinEvent -LogName qsiusbd/Operational -MaxEvents 30 | Format-Table TimeCreated, Id, LevelDisplayName, Message -Wrap
 ```
 
 For debug detail as well, stop the service and run it in an elevated console:
-`Stop-Service usbipd; usbipd server` (Ctrl+C, then `Start-Service usbipd`).
+`Stop-Service qsiusbd; qsiusbd server` (Ctrl+C, then `Start-Service qsiusbd`).
 
 ## Configuration reference
 
-`appsettings.json` next to `usbipd.exe`:
+`appsettings.json` next to `qsiusbd.exe`:
 
 | Key | Default | Meaning |
 |---|---|---|
 | `ConnectionStrings:Usbipd` | | SQL Server connection string (Windows authentication) |
-| `usbipd:Tls:Port` | 3241 | TLS port |
-| `usbipd:Tls:ListenAddress` | all | Listen on one local address only |
-| `usbipd:Tls:ServerCertificateThumbprint` | | Server certificate in Local Computer > Personal |
-| `usbipd:Tls:ClientCaThumbprints` | | CAs that may issue client certificates |
-| `usbipd:Tls:HandshakeTimeoutSeconds` | 10 | |
-| `usbipd:Tls:RevocationMode` | NoCheck | `NoCheck`, `Online` or `Offline` for client certificates |
-| `usbipd:Otp:Issuer` | QSI USB/IP | Name shown in authenticator apps |
-| `usbipd:Otp:CertificateThumbprint` | TLS server certificate | RSA certificate in Local Computer > Personal that OTP secrets are encrypted to |
-| `usbipd:Session:MaxDurationMinutes` | 10 | Hard limit per attach |
-| `usbipd:Session:ImportTimeoutSeconds` | 10 | Time allowed for the sign-in after the TLS handshake, and again between sign-in and import |
-| `usbipd:Session:RecheckIntervalSeconds` | 2 | How often active sessions are re-checked |
+| `qsiusbd:Tls:Port` | 3241 | TLS port |
+| `qsiusbd:Tls:ListenAddress` | all | Listen on one local address only |
+| `qsiusbd:Tls:ServerCertificateThumbprint` | | Server certificate in Local Computer > Personal |
+| `qsiusbd:Tls:ClientCaThumbprints` | | CAs that may issue client certificates |
+| `qsiusbd:Tls:HandshakeTimeoutSeconds` | 10 | |
+| `qsiusbd:Tls:RevocationMode` | NoCheck | `NoCheck`, `Online` or `Offline` for client certificates |
+| `qsiusbd:Otp:Issuer` | QSI USB/IP | Name shown in authenticator apps |
+| `qsiusbd:Otp:CertificateThumbprint` | TLS server certificate | RSA certificate in Local Computer > Personal that OTP secrets are encrypted to |
+| `qsiusbd:Session:MaxDurationMinutes` | 10 | Hard limit per attach |
+| `qsiusbd:Session:ImportTimeoutSeconds` | 10 | Time allowed for the sign-in after the TLS handshake, and again between sign-in and import |
+| `qsiusbd:Session:RecheckIntervalSeconds` | 2 | How often active sessions are re-checked |
 
 ## Building from source
 
 The .NET 10 SDK (or Visual Studio with it), and WiX 7 for the installer. The platform must be given explicitly:
 
 ```powershell
-dotnet build usbipd-win.slnx -c Release -p:Platform=x64
+dotnet build qsiusbd.slnx -c Release -p:Platform=x64
 dotnet test UnitTests\UnitTests.csproj -p:Platform=x64
-dotnet publish Usbipd\Usbipd.csproj -c Release -p:PublishProfile=x64
+dotnet publish Usbipd\Usbipd.csproj -c Release -p:Platform=x64 -p:PublishProfile=x64
+dotnet publish Usbipd.PowerShell\Usbipd.PowerShell.csproj -c Release
+dotnet build Installer -c Release -p:Platform=x64   # Installer\bin\x64\Release\QSIUSBD_<version>_x64.msi
 ```
 
 Schema changes are EF Core migrations in `Usbipd\Data\Migrations`:

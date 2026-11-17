@@ -135,7 +135,7 @@ static partial class ConsoleTools
     /// <summary>
     /// Errors go to <see cref="Console.Error"/>. Information and warnings are not failures, so they go to
     /// <see cref="Console.Out"/>: PowerShell shows anything on the error stream as an error record.
-    /// When the output is redirected (piped or captured, for example 'usbipd state' into a JSON parser),
+    /// When the output is redirected (piped or captured, for example 'qsiusbd state' into a JSON parser),
     /// they go to <see cref="Console.Error"/> instead, so that the output stays clean data.
     /// </summary>
     static void ReportText(this IConsole console, string level, string text, bool toOutput)
@@ -251,7 +251,7 @@ static partial class ConsoleTools
         }
         if (VBoxUsbMon.GetRunningVersion() is not UsbSupVersion version)
         {
-            // The usbipd service has a dependency on VBoxUsbMon, but we can still get here when running the server from the command line.
+            // The qsiusbd service has a dependency on VBoxUsbMon, but we can still get here when running the server from the command line.
             Report("The VBoxUsbMon driver is currently not running; a reboot should fix that.");
             return false;
         }
@@ -289,7 +289,7 @@ static partial class ConsoleTools
     }
 
     /// <summary>
-    /// The process must run elevated; no sign-in (for example 'usbipd server' in a console).
+    /// The process must run elevated; no sign-in (for example 'qsiusbd server' in a console).
     /// </summary>
     public static bool CheckElevated(IConsole console)
     {

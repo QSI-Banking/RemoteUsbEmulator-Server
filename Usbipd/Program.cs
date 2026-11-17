@@ -576,7 +576,7 @@ static class Program
                 //  user add
                 //
                 var addCommand = new Command("add", "Map a user to a device\0" + $"""
-                    Maps a user to one shared device. The device must already be shared with 'usbipd bind'. \
+                    Maps a user to one shared device. The device must already be shared with 'qsiusbd bind'. \
                     The mapping is persistent and effective immediately.
 
                     {OneOfRequiredText(busIdOption, guidOption)}
@@ -679,7 +679,7 @@ static class Program
                     await commandHandlers.UserOtpStatus(console, cancellationToken)
                 );
                 var otpCommand = new Command("otp", "Manage one-time password secrets\0" +
-                    "A user signs in with a code from an authenticator app (TOTP). 'usbipd user add' creates the secret of a new user.");
+                    "A user signs in with a code from an authenticator app (TOTP). 'qsiusbd user add' creates the secret of a new user.");
                 otpCommand.Subcommands.Add(resetCommand);
                 otpCommand.Subcommands.Add(statusCommand);
                 userCommand.Subcommands.Add(otpCommand);
@@ -692,7 +692,7 @@ static class Program
             //
             var clientCommand = new Command("client", "Manage client certificates\0" +
                 "Only listed, enabled client certificates may connect (to all servers). " +
-                "They must also be issued by a CA in usbipd:Tls:ClientCaThumbprints.");
+                "They must also be issued by a CA in qsiusbd:Tls:ClientCaThumbprints.");
 
             static Option<string> CreateThumbprintOption(string description, bool required)
             {

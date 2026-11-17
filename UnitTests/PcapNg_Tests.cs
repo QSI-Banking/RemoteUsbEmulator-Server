@@ -16,10 +16,10 @@ sealed partial class PcapNg_Tests
     {
         public MockConfiguration(string? path, uint? snapLength = null)
         {
-            Mock.Setup(m => m["usbipd:PcapNg:Path"]).Returns(path!);
+            Mock.Setup(m => m["qsiusbd:PcapNg:Path"]).Returns(path!);
             if (path is not null)
             {
-                Mock.Setup(m => m["usbipd:PcapNg:SnapLength"]).Returns(snapLength?.ToString()!);
+                Mock.Setup(m => m["qsiusbd:PcapNg:SnapLength"]).Returns(snapLength?.ToString()!);
             }
         }
 

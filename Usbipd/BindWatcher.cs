@@ -23,7 +23,7 @@ namespace Usbipd;
 /// including when Windows last saw it plugged in: a replug that raised no event (a device in an error state has no
 /// running driver to stop) is caught there, and the bind is dropped.</item>
 /// </list>
-/// Nothing is ever shared again automatically: a dropped bind needs a new 'usbipd bind' by an administrator.
+/// Nothing is ever shared again automatically: a dropped bind needs a new 'qsiusbd bind' by an administrator.
 /// </summary>
 sealed class BindWatcher(SessionRegistry sessionRegistry, ILogger<BindWatcher> logger) : BackgroundService
 {
@@ -136,7 +136,7 @@ sealed class BindWatcher(SessionRegistry sessionRegistry, ILogger<BindWatcher> l
         }
         if (!RunRecorded || bind.ConfirmedRunId != RunId)
         {
-            return "the bind needs a review since the service started ('usbipd bind --review')";
+            return "the bind needs a review since the service started ('qsiusbd bind --review')";
         }
         if (!WindowsDevice.TryCreate(instanceId, out var device) || !device.IsPresent)
         {

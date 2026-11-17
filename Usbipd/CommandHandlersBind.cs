@@ -9,7 +9,7 @@ using static Usbipd.ConsoleTools;
 namespace Usbipd;
 
 /// <summary>
-/// 'usbipd bind' and 'usbipd bind --review'.
+/// 'qsiusbd bind' and 'qsiusbd bind --review'.
 /// <para>
 /// A bind always puts the device on the VBoxUSB driver (the server itself can then no longer use it), records what the
 /// device is (see <see cref="DeviceIdentity"/>), and is confirmed for the current run of the service. The service drops
@@ -57,7 +57,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             }
             if (!await WaitForVBoxDriverAsync(windowsDevice, cancellationToken))
             {
-                console.ReportError("The VBoxUSB driver did not start for the device; a reboot may be required. Then run 'usbipd bind' again.");
+                console.ReportError("The VBoxUSB driver did not start for the device; a reboot may be required. Then run 'qsiusbd bind' again.");
                 return ExitCode.Failure;
             }
         }
@@ -83,7 +83,7 @@ sealed partial class CommandHandlers : ICommandHandlers
         if (existing?.Fingerprint is not null && identity.GetMismatch(existing.Fingerprint, existing.LocationPath, existing.ArrivedUtc) is { } mismatch)
         {
             console.ReportError($"Device with busid '{busId}' is not confirmed: {mismatch}. " +
-                $"To share the device that is there now, run 'usbipd unbind --guid {guid:D}' and bind it again.");
+                $"To share the device that is there now, run 'qsiusbd unbind --guid {guid:D}' and bind it again.");
             return ExitCode.Failure;
         }
         if (!BindStore.Confirm(guid, identity, runId, review: existing is not null))
@@ -101,7 +101,7 @@ sealed partial class CommandHandlers : ICommandHandlers
         }
         if (runId is null)
         {
-            console.ReportWarning("The service is not running; the device needs 'usbipd bind --review' after the service starts.");
+            console.ReportWarning("The service is not running; the device needs 'qsiusbd bind --review' after the service starts.");
         }
         return ExitCode.Success;
     }
@@ -176,7 +176,7 @@ sealed partial class CommandHandlers : ICommandHandlers
                 .Where(d => d.BusId.HasValue && !d.BusId.Value.IsIncompatibleHub && d.PersistedGuid is null && d.IsForced))
             {
                 console.ReportWarning($"The device with busid '{quarantined.BusId}' is quarantined (its bind was dropped); " +
-                    $"it is not shared. Use 'usbipd bind --busid {quarantined.BusId}' to share it again, or 'usbipd unbind --busid {quarantined.BusId}' to release it.");
+                    $"it is not shared. Use 'qsiusbd bind --busid {quarantined.BusId}' to share it again, or 'qsiusbd unbind --busid {quarantined.BusId}' to release it.");
             }
             return ExitCode.Success;
         }
@@ -238,7 +238,7 @@ sealed partial class CommandHandlers : ICommandHandlers
                     console.Out.WriteLine($"  Recorded:     {bind.HardwareId}, port {bind.LocationPath}, interfaces {bind.Interfaces}");
                     console.Out.WriteLine($"                fingerprint {bind.Fingerprint}");
                 }
-                console.ReportError($"Not confirmed: {problem}. Use 'usbipd unbind --guid {bind.Guid:D}'; to share what is there now, bind it again.");
+                console.ReportError($"Not confirmed: {problem}. Use 'qsiusbd unbind --guid {bind.Guid:D}'; to share what is there now, bind it again.");
                 ++refused;
                 continue;
             }

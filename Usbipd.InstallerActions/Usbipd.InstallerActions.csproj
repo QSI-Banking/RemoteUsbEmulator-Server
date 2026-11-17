@@ -9,8 +9,8 @@ SPDX-License-Identifier: GPL-3.0-only
   <!--
   Managed (DTF) custom actions for the MSI user interface: fill the certificate drop-downs from the
   Windows certificate store and preset the TLS settings from an existing appsettings.json.
-  They run in msiexec only; nothing is installed. Writing the settings is done by usbipd.exe itself
-  ('usbipd installer configure_tls'), as for the other installer actions.
+  They run in msiexec only; nothing is installed. Writing the settings is done by qsiusbd.exe itself
+  ('qsiusbd installer configure_tls'), as for the other installer actions.
   -->
   <PropertyGroup>
     <!-- DTF custom actions run on the .NET Framework that is part of Windows -->
