@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-only
 
-using System.Text;
+using System.CommandLine.Parsing;
 using static Usbipd.ConsoleTools;
 
 namespace Usbipd;
@@ -47,7 +47,8 @@ sealed partial class CommandHandlers : ICommandHandlers
                 {
                     break;
                 }
-                var args = SplitCommandLine(line);
+                // Quotes group words ("Lab PC 42"); backslashes are literal, so Windows paths need no escaping.
+                var args = CommandLineParser.SplitCommandLine(line).ToList();
                 if (args.Count > 0 && args[0].ToUpperInvariant() is "QSIUSBD" or "QSIUSBD.EXE")
                 {
                     args.RemoveAt(0);
@@ -85,44 +86,5 @@ sealed partial class CommandHandlers : ICommandHandlers
             AdminAuthorization.InSession = false;
             AdminAuthorization.SignOut();
         }
-    }
-
-    /// <summary>
-    /// Splits a typed command line: spaces separate arguments, double quotes group them ("Lab PC 42").
-    /// Backslashes are literal, so Windows paths need no escaping.
-    /// </summary>
-    internal static List<string> SplitCommandLine(string line)
-    {
-        var args = new List<string>();
-        var current = new StringBuilder();
-        var inQuotes = false;
-        var hasArgument = false;
-        foreach (var c in line)
-        {
-            if (c == '"')
-            {
-                inQuotes = !inQuotes;
-                hasArgument = true;
-            }
-            else if (char.IsWhiteSpace(c) && !inQuotes)
-            {
-                if (hasArgument)
-                {
-                    args.Add(current.ToString());
-                    _ = current.Clear();
-                    hasArgument = false;
-                }
-            }
-            else
-            {
-                _ = current.Append(c);
-                hasArgument = true;
-            }
-        }
-        if (hasArgument)
-        {
-            args.Add(current.ToString());
-        }
-        return args;
     }
 }

@@ -73,7 +73,7 @@ sealed class SessionRegistry_Tests
         var configuration = CreateConfiguration(($"qsiusbd:Session:{key}", value));
 
         _ = Assert.ThrowsExactly<InvalidOperationException>(() => SessionSettings.Read(configuration));
-        Assert.AreEqual(SessionSettings.DefaultMaxDuration, SessionSettings.ReadOrDefault(configuration).MaxDuration);
+        Assert.AreEqual(TimeSpan.FromMinutes(10), SessionSettings.ReadOrDefault(configuration).MaxDuration);
     }
 
     [TestMethod]

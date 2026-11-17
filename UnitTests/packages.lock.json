@@ -700,6 +700,7 @@
         "dependencies": {
           "Microsoft.EntityFrameworkCore.SqlServer": "[10.0.14, )",
           "Microsoft.Extensions.Hosting.WindowsServices": "[10.0.14, )",
+          "Otp.NET": "[1.4.1, )",
           "QRCoder": "[1.6.0, )",
           "System.CommandLine": "[2.0.14, )"
         }
@@ -727,6 +728,12 @@
           "Microsoft.Extensions.Logging.EventLog": "10.0.14",
           "System.ServiceProcess.ServiceController": "10.0.14"
         }
+      },
+      "Otp.NET": {
+        "type": "CentralTransitive",
+        "requested": "[1.4.1, )",
+        "resolved": "1.4.1",
+        "contentHash": "UXjZ80T6BfVACJWmEcz4UFZ93hwX3STKojKvVpPk3qUhubjnLwIiZMsI4Hh91HhYxC0JlatNdNrVK2wkv4O9/Q=="
       },
       "QRCoder": {
         "type": "CentralTransitive",

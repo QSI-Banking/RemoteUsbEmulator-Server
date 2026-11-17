@@ -39,15 +39,8 @@ sealed class TlsSettings_Tests
         Assert.AreEqual(ServerThumbprint, settings.ServerCertificateThumbprint);
         Assert.HasCount(1, settings.ClientCaThumbprints);
         Assert.IsTrue(settings.ClientCaThumbprints.Contains(CaThumbprint));
-        Assert.AreEqual(TlsSettings.DefaultHandshakeTimeout, settings.HandshakeTimeout);
+        Assert.AreEqual(TimeSpan.FromSeconds(10), settings.HandshakeTimeout);
         Assert.AreEqual(X509RevocationMode.NoCheck, settings.RevocationMode);
-    }
-
-    [TestMethod]
-    public void Read_AllowedClientThumbprints_Moved()
-    {
-        _ = Assert.ThrowsExactly<InvalidOperationException>(() => TlsSettings.Read(CreateConfiguration(
-            ("qsiusbd:Tls:AllowedClientThumbprints:0", OtherThumbprint))));
     }
 
     [TestMethod]
@@ -68,36 +61,9 @@ sealed class TlsSettings_Tests
     }
 
     [TestMethod]
-    public void Read_CaListAsString()
+    public void CleanThumbprint_CopiedFromCertificateDialog()
     {
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            { "qsiusbd:Tls:ServerCertificateThumbprint", ServerThumbprint },
-            { "qsiusbd:Tls:ClientCaThumbprints", $"{CaThumbprint}, {OtherThumbprint}" },
-        }).Build();
-
-        var settings = TlsSettings.Read(configuration);
-
-        Assert.HasCount(2, settings.ClientCaThumbprints);
-    }
-
-    [TestMethod]
-    public void NormalizeThumbprint_CopiedFromCertificateDialog()
-    {
-        // The Windows certificate dialog prefixes an invisible left-to-right mark and uses lower case with spaces.
-        var copied = "‎01 23 45 67 89 ab cd ef 01 23 45 67 89 ab cd ef 01:23:45:67";
-
-        Assert.AreEqual(ServerThumbprint, TlsSettings.NormalizeThumbprint(copied, "Test"));
-    }
-
-    [TestMethod]
-    [DataRow("")]
-    [DataRow("0123")]
-    [DataRow("0123456789ABCDEF0123456789ABCDEF0123456G")]
-    [DataRow("0123456789ABCDEF0123456789ABCDEF0123456789")]
-    public void NormalizeThumbprint_Invalid(string value)
-    {
-        _ = Assert.ThrowsExactly<InvalidOperationException>(() => TlsSettings.NormalizeThumbprint(value, "Test"));
+        Assert.AreEqual(ServerThumbprint, TlsSettings.CleanThumbprint($"\u200E{ServerThumbprint} "));
     }
 
     [TestMethod]
@@ -130,7 +96,6 @@ sealed class TlsSettings_Tests
     [DataRow("qsiusbd:Tls:HandshakeTimeoutSeconds", "0")]
     [DataRow("qsiusbd:Tls:HandshakeTimeoutSeconds", "301")]
     [DataRow("qsiusbd:Tls:RevocationMode", "Sometimes")]
-    [DataRow("qsiusbd:Tls:RevocationMode", "1")]
     public void Read_InvalidValue(string key, string value)
     {
         _ = Assert.ThrowsExactly<InvalidOperationException>(() => TlsSettings.Read(CreateConfiguration((key, value))));

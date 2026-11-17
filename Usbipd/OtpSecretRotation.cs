@@ -83,7 +83,7 @@ sealed class OtpSecretRotation(IConfiguration configuration, ILogger<OtpSecretRo
         {
             using var certificate = OtpCertificate.Load(Configuration);
             var newProtectedSecret = Cryptography.Encrypt(userId, secret, certificate);
-            var newThumbprint = certificate.Thumbprint.ToUpperInvariant();
+            var newThumbprint = certificate.Thumbprint;
             if (db.OtpSecrets
                 .Where(o => o.UserId == userId && o.ProtectedSecret == protectedSecret)
                 .ExecuteUpdate(s => s

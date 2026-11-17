@@ -46,7 +46,7 @@ sealed class SqlUserAuthenticator(IConfiguration configuration, TimeProvider tim
         }
         try
         {
-            var step = Totp.Verify(secret, otp, Totp.GetStep(TimeProvider.GetUtcNow()), entry.LastAcceptedStep);
+            var step = Otp.Verify(secret, otp, TimeProvider.GetUtcNow().UtcDateTime, entry.LastAcceptedStep);
             if (step is not { } acceptedStep)
             {
                 return false;

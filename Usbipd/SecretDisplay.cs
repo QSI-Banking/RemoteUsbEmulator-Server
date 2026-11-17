@@ -128,38 +128,15 @@ static partial class SecretDisplay
     }
 
     /// <summary>
-    /// Dark modules on a light background (as phone cameras expect, also in a dark console), two module rows per text line,
-    /// with a quiet zone of 2 modules (enough for phone cameras, and 2 lines shorter than the standard 4).
+    /// Two module rows per text line (QRCoder's small ASCII renderer), dark on a light background as phone cameras expect,
+    /// also in a dark console.
     /// </summary>
     static List<string> RenderQrCode(string content)
     {
-        const int QuietZone = 2;
         using var generator = new QRCodeGenerator();
         using var data = generator.CreateQrCode(content, QRCodeGenerator.ECCLevel.L);
-        var matrix = data.ModuleMatrix;
-        // The matrix includes the standard quiet zone of 4 modules.
-        var first = 4 - QuietZone;
-        var last = matrix.Count - 1 - first;
-        var lines = new List<string>();
-        var builder = new StringBuilder();
-        for (var y = first; y <= last; y += 2)
-        {
-            _ = builder.Clear().Append("  \e[30;107m");
-            for (var x = first; x <= last; ++x)
-            {
-                var top = matrix[y][x];
-                var bottom = y + 1 <= last && matrix[y + 1][x];
-                _ = builder.Append((top, bottom) switch
-                {
-                    (true, true) => '█',
-                    (true, false) => '▀',
-                    (false, true) => '▄',
-                    _ => ' ',
-                });
-            }
-            lines.Add(builder.Append("\e[0m").ToString());
-        }
-        return lines;
+        using var code = new AsciiQRCode(data);
+        return [.. code.GetGraphicSmall().Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(line => $"  \e[30;107m{line}\e[0m")];
     }
 
     static bool EnableVirtualTerminal()

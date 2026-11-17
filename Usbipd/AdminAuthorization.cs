@@ -5,6 +5,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Security.Principal;
 using Microsoft.Win32.SafeHandles;
@@ -254,30 +255,13 @@ static partial class AdminAuthorization
     }
 
     /// <summary>
-    /// With UAC, the token of an administrator has the Administrators group as deny-only; it is still a member.
+    /// With UAC, the Administrators group is deny-only in an administrator's token; the account is still a member.
     /// </summary>
-    static unsafe bool IsAdministrator(SafeAccessTokenHandle token)
+    static bool IsAdministrator(SafeAccessTokenHandle token)
     {
-        _ = GetTokenInformation(token, TokenGroups, null, 0, out var length);
-        var buffer = new byte[length];
-        fixed (byte* p = buffer)
-        {
-            if (!GetTokenInformation(token, TokenGroups, p, length, out _))
-            {
-                throw new Win32Exception(Marshal.GetLastPInvokeError(), nameof(GetTokenInformation));
-            }
-            var count = *(uint*)p;
-            // TOKEN_GROUPS: DWORD GroupCount, then SID_AND_ATTRIBUTES[] aligned to the pointer size.
-            var groups = (SID_AND_ATTRIBUTES*)(p + IntPtr.Size);
-            for (var i = 0; i < count; ++i)
-            {
-                if (new SecurityIdentifier(groups[i].Sid) == AdministratorsSid)
-                {
-                    return true;
-                }
-            }
-        }
-        return false;
+        using var identity = new WindowsIdentity(token.DangerousGetHandle());
+        return identity.Claims.Any(claim => (claim.Type is ClaimTypes.GroupSid or ClaimTypes.DenyOnlySid)
+            && claim.Value == AdministratorsSid.Value);
     }
 
     static unsafe bool PromptForCredentials(IConsole console, string message, uint authError, out string userName, out string domain,
@@ -390,7 +374,6 @@ static partial class AdminAuthorization
         internal const uint CREDUIWIN_GENERIC = 0x1;
         internal const uint ERROR_CANCELLED = 1223;
         internal const uint ERROR_ACCESS_DENIED = 5;
-        internal const int TokenGroups = 2;
 
         [StructLayout(LayoutKind.Sequential)]
         internal unsafe struct CREDUI_INFOW
@@ -400,13 +383,6 @@ static partial class AdminAuthorization
             public char* pszMessageText;
             public char* pszCaptionText;
             public nint hbmBanner;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        internal struct SID_AND_ATTRIBUTES
-        {
-            public nint Sid;
-            public uint Attributes;
         }
 
         [LibraryImport("credui.dll")]
@@ -425,12 +401,6 @@ static partial class AdminAuthorization
         [return: MarshalAs(UnmanagedType.Bool)]
         internal static unsafe partial bool LogonUserW(string lpszUsername, string? lpszDomain, char* lpszPassword, uint dwLogonType,
             uint dwLogonProvider, out SafeAccessTokenHandle phToken);
-
-        [LibraryImport("advapi32.dll", SetLastError = true)]
-        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        internal static unsafe partial bool GetTokenInformation(SafeAccessTokenHandle tokenHandle, int tokenInformationClass, void* tokenInformation,
-            uint tokenInformationLength, out uint returnLength);
 
         [LibraryImport("kernel32.dll")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]

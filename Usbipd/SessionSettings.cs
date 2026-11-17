@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-only
 
-using System.Globalization;
+using System.ComponentModel.DataAnnotations;
 
 namespace Usbipd;
 
@@ -12,36 +12,31 @@ namespace Usbipd;
 sealed class SessionSettings
 {
     public const string SectionName = "qsiusbd:Session";
-    public static readonly TimeSpan DefaultMaxDuration = TimeSpan.FromMinutes(10);
-    public static readonly TimeSpan DefaultImportTimeout = TimeSpan.FromSeconds(10);
-    public static readonly TimeSpan DefaultRecheckInterval = TimeSpan.FromSeconds(2);
 
     /// <summary>
     /// An attached device is detached this long after the attach, whatever the activity (no warning).
     /// </summary>
-    public TimeSpan MaxDuration { get; private init; } = DefaultMaxDuration;
+    [Range(1, 1440)]
+    public int MaxDurationMinutes { get; set; } = 10;
 
     /// <summary>
-    /// After a successful OP_REQ_AUTH, the client must send OP_REQ_IMPORT within this time.
+    /// The sign-in must follow the TLS handshake within this time, and the import must follow the sign-in within it.
     /// </summary>
-    public TimeSpan ImportTimeout { get; private init; } = DefaultImportTimeout;
+    [Range(1, 300)]
+    public int ImportTimeoutSeconds { get; set; } = 10;
 
     /// <summary>
     /// How often active sessions are checked against the current user mappings.
     /// </summary>
-    public TimeSpan RecheckInterval { get; private init; } = DefaultRecheckInterval;
+    [Range(1, 60)]
+    public int RecheckIntervalSeconds { get; set; } = 2;
+
+    public TimeSpan MaxDuration => TimeSpan.FromMinutes(MaxDurationMinutes);
+    public TimeSpan ImportTimeout => TimeSpan.FromSeconds(ImportTimeoutSeconds);
+    public TimeSpan RecheckInterval => TimeSpan.FromSeconds(RecheckIntervalSeconds);
 
     /// <exception cref="InvalidOperationException">A value is invalid.</exception>
-    public static SessionSettings Read(IConfiguration configuration)
-    {
-        var section = configuration.GetSection(SectionName);
-        return new()
-        {
-            MaxDuration = ReadValue(section, "MaxDurationMinutes", 1, 1440, DefaultMaxDuration, TimeSpan.FromMinutes),
-            ImportTimeout = ReadValue(section, "ImportTimeoutSeconds", 1, 300, DefaultImportTimeout, TimeSpan.FromSeconds),
-            RecheckInterval = ReadValue(section, "RecheckIntervalSeconds", 1, 60, DefaultRecheckInterval, TimeSpan.FromSeconds),
-        };
-    }
+    public static SessionSettings Read(IConfiguration configuration) => SettingsReader.Read(configuration, SectionName, new SessionSettings());
 
     /// <summary>
     /// Like <see cref="Read"/>, but falls back to the defaults. The service validates with <see cref="Read"/> at start.
@@ -56,20 +51,5 @@ sealed class SessionSettings
         {
             return new();
         }
-    }
-
-    static TimeSpan ReadValue(IConfigurationSection section, string key, int minimum, int maximum, TimeSpan defaultValue,
-        Func<double, TimeSpan> toTimeSpan)
-    {
-        var value = section[key];
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return defaultValue;
-        }
-        if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number < minimum || number > maximum)
-        {
-            throw new InvalidOperationException($"{SectionName}:{key} '{value}' must be a number from {minimum} to {maximum}.");
-        }
-        return toTimeSpan(number);
     }
 }

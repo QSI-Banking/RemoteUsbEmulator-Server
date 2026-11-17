@@ -46,20 +46,6 @@ static class Program
         return guid;
     }
 
-    static string ParseThumbprint(ArgumentResult argumentResult)
-    {
-        var value = argumentResult.Tokens[0].Value;
-        try
-        {
-            return TlsSettings.NormalizeThumbprint(value, "thumbprint");
-        }
-        catch (InvalidOperationException)
-        {
-            argumentResult.AddError($"Invalid thumbprint '{value}'; use the 40 hex digit SHA-1 thumbprint of the certificate.");
-            return value;
-        }
-    }
-
     static string ParseUserName(ArgumentResult argumentResult)
     {
         var value = argumentResult.Tokens[0].Value;
@@ -701,7 +687,7 @@ static class Program
                     Description = description,
                     HelpName = "THUMBPRINT",
                     Required = required,
-                    CustomParser = ParseThumbprint,
+                    CustomParser = result => TlsSettings.CleanThumbprint(result.Tokens[0].Value),
                 };
                 option.CompletionSources.Add(completionContext => CompletionGuard(completionContext, () =>
                     CommandHandlers.TryGetClientThumbprints().Select(t => new CompletionItem(t))));

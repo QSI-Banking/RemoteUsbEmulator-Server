@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-only
 
+using System.CommandLine.Parsing;
+
 namespace UnitTests;
 
 [TestClass]
@@ -32,14 +34,17 @@ sealed class Parse_admin_Tests
     static readonly string[] ExpectedQuoted = ["client", "add", "--certificate", @"C:\certs\pc 42.cer", "--name", "Lab PC 42"];
     static readonly string[] ExpectedEmpty = ["user", "add", "--name", ""];
 
+    /// <summary>
+    /// The admin session splits typed lines with System.CommandLine; this is what it relies on.
+    /// </summary>
     [TestMethod]
     public void SplitCommandLine()
     {
         CollectionAssert.AreEqual(ExpectedQuoted,
-            CommandHandlers.SplitCommandLine(@"client add --certificate ""C:\certs\pc 42.cer""  --name ""Lab PC 42"" "));
+            CommandLineParser.SplitCommandLine(@"client add --certificate ""C:\certs\pc 42.cer""  --name ""Lab PC 42"" ").ToList());
         CollectionAssert.AreEqual(ExpectedEmpty,
-            CommandHandlers.SplitCommandLine(@"user add --name """""));
-        Assert.IsEmpty(CommandHandlers.SplitCommandLine("   "));
+            CommandLineParser.SplitCommandLine(@"user add --name """"").ToList());
+        Assert.IsEmpty(CommandLineParser.SplitCommandLine("   ").ToList());
     }
 
     [TestMethod]

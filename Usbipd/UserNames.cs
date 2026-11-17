@@ -3,13 +3,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.Diagnostics.CodeAnalysis;
+using System.Text.RegularExpressions;
 
 namespace Usbipd;
 
 /// <summary>
 /// Rules for user names used by `qsiusbd user` and by OP_REQ_AUTH.
 /// </summary>
-static class UserNames
+static partial class UserNames
 {
     /// <summary>
     /// Same as <see cref="Interop.UsbIp.USBIP_MAX_USER"/>.
@@ -23,19 +24,8 @@ static class UserNames
     /// </summary>
     public static StringComparer Comparer => StringComparer.OrdinalIgnoreCase;
 
-    public static bool IsValid([NotNullWhen(true)] string? userName)
-    {
-        if (string.IsNullOrEmpty(userName) || userName.Length > MaxLength)
-        {
-            return false;
-        }
-        foreach (var c in userName)
-        {
-            if (!(char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-'))
-            {
-                return false;
-            }
-        }
-        return true;
-    }
+    public static bool IsValid([NotNullWhen(true)] string? userName) => userName is not null && ValidName().IsMatch(userName);
+
+    [GeneratedRegex(@"^[A-Za-z0-9._-]{1,63}\z")]
+    private static partial Regex ValidName();
 }

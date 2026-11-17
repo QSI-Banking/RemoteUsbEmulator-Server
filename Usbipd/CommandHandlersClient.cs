@@ -31,7 +31,7 @@ sealed partial class CommandHandlers : ICommandHandlers
             try
             {
                 using var certificate = X509CertificateLoader.LoadCertificateFromFile(certificateFile);
-                thumbprint = certificate.Thumbprint.ToUpperInvariant();
+                thumbprint = certificate.Thumbprint;
                 subject = certificate.Subject;
                 notAfterUtc = certificate.NotAfter.ToUniversalTime();
             }

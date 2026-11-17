@@ -146,11 +146,9 @@ sealed partial class CommandHandlers : ICommandHandlers
     /// </summary>
     static void ReportOtpSecret(string userName, byte[] secret, IConsole console)
     {
-        var issuer = Totp.GetIssuer(Data.Database.LoadConfiguration());
-        var base32 = Totp.ToBase32(secret);
-        var grouped = string.Join(' ', Enumerable.Range(0, (base32.Length + 3) / 4)
-            .Select(i => base32.Substring(i * 4, Math.Min(4, base32.Length - (i * 4)))));
-        var keyUri = Totp.GetKeyUri(issuer, userName, secret);
+        var issuer = Otp.GetIssuer(Data.Database.LoadConfiguration());
+        var grouped = string.Join(' ', Otp.ToBase32(secret).Chunk(4).Select(group => new string(group)));
+        var keyUri = Otp.GetKeyUri(issuer, userName, secret);
         var shown = SecretDisplay.Show(console, $"""
             One-time password secret for '{userName}'. Scan the QR code with the user's authenticator app now, or enter
             the secret by hand; it is not shown again. Anyone who sees this secret can generate the user's codes.
@@ -158,7 +156,7 @@ sealed partial class CommandHandlers : ICommandHandlers
               Issuer:   {issuer}
               Account:  {userName}
               Secret:   {grouped}
-              Type:     time-based (TOTP), SHA-1, {Totp.Digits} digits, {Totp.StepSeconds} seconds
+              Type:     time-based (TOTP), SHA-1, 6 digits, 30 seconds
             """, keyUri);
         if (shown)
         {

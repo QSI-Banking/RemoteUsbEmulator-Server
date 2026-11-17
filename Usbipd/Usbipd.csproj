@@ -89,6 +89,7 @@ SPDX-License-Identifier: GPL-3.0-only
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" />
     <PackageReference Include="Microsoft.Windows.CsWin32" PrivateAssets="all" />
+    <PackageReference Include="Otp.NET" />
     <PackageReference Include="QRCoder" />
     <PackageReference Include="System.CommandLine" />
   </ItemGroup>

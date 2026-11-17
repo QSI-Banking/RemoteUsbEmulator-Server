@@ -40,16 +40,17 @@ static class InstallerTlsConfiguration
 
             if (!string.IsNullOrWhiteSpace(serverCertificate))
             {
-                tls["ServerCertificateThumbprint"] = TlsSettings.NormalizeThumbprint(serverCertificate, "ServerCertificateThumbprint");
+                tls["ServerCertificateThumbprint"] = TlsSettings.CleanThumbprint(serverCertificate);
             }
 
             if (!string.IsNullOrWhiteSpace(clientCertificateAuthorities))
             {
                 var thumbprints = new JsonArray();
-                foreach (var thumbprint in TlsSettings.SplitList(clientCertificateAuthorities))
+                // The installer passes one string: thumbprints separated by commas, semicolons or spaces.
+                foreach (var thumbprint in clientCertificateAuthorities.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries))
                 {
                     // the JsonNode overload; the generic Add<T> is not trim/AOT safe
-                    thumbprints.Add((JsonNode)JsonValue.Create(TlsSettings.NormalizeThumbprint(thumbprint, "ClientCaThumbprints")));
+                    thumbprints.Add((JsonNode)JsonValue.Create(TlsSettings.CleanThumbprint(thumbprint)));
                 }
                 tls["ClientCaThumbprints"] = thumbprints;
             }

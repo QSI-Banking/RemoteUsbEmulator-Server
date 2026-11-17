@@ -25,16 +25,11 @@ static class OtpCertificate
         var value = configuration[ThumbprintKey];
         if (string.IsNullOrWhiteSpace(value))
         {
-            return TlsSettings.NormalizeThumbprint(configuration[$"{TlsSettings.SectionName}:ServerCertificateThumbprint"], "ServerCertificateThumbprint");
+            value = configuration[$"{TlsSettings.SectionName}:ServerCertificateThumbprint"];
         }
-        try
-        {
-            return TlsSettings.NormalizeThumbprint(value, "unused");
-        }
-        catch (InvalidOperationException ex)
-        {
-            throw new InvalidOperationException($"{ThumbprintKey} must be a 40 hex digit (SHA-1) certificate thumbprint.", ex);
-        }
+        return string.IsNullOrWhiteSpace(value)
+            ? throw new InvalidOperationException($"Neither {ThumbprintKey} nor {TlsSettings.SectionName}:ServerCertificateThumbprint is set.")
+            : TlsSettings.CleanThumbprint(value);
     }
 
     /// <summary>

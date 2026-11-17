@@ -133,7 +133,7 @@ static class UserStore
         {
             throw new InvalidOperationException("The user must be saved before it gets a secret.");
         }
-        var secret = Totp.CreateSecret();
+        var secret = Otp.CreateSecret();
         var protectedSecret = Cryptography.Encrypt(user.Id, secret, certificate);
         var now = DateTime.UtcNow;
         var account = CurrentAccount;
@@ -142,7 +142,7 @@ static class UserStore
             User = user,
         };
         user.OtpSecret.ProtectedSecret = protectedSecret;
-        user.OtpSecret.CertificateThumbprint = certificate.Thumbprint.ToUpperInvariant();
+        user.OtpSecret.CertificateThumbprint = certificate.Thumbprint;
         user.OtpSecret.LastAcceptedStep = 0;
         user.OtpSecret.CreatedUtc = now;
         user.OtpSecret.CreatedBy = account;
