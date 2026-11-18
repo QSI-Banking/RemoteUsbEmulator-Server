@@ -5,6 +5,7 @@
 using System.ComponentModel;
 using System.IO.Pipelines;
 using System.Net;
+using System.Runtime.InteropServices;
 using Windows.Win32.Devices.DeviceAndDriverInstallation;
 using Windows.Win32.Devices.Usb;
 using Windows.Win32.Foundation;
@@ -210,6 +211,8 @@ sealed class Tools_Tests
         BOOL failure = false;
         var exception = Assert.ThrowsExactly<Win32Exception>(() =>
         {
+            // The last error is per thread and may be left over from another test; an HRESULT must work too.
+            Marshal.SetLastPInvokeError(unchecked((int)0x80070005));
             failure.ThrowOnWin32Error(testMessage);
         });
         Assert.Contains(testMessage, exception.Message);

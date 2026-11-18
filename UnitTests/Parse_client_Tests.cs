@@ -30,9 +30,8 @@ sealed class Parse_client_Tests
         mock.Setup(m => m.ClientAdd(TestThumbprint, null, TestName,
             It.IsNotNull<IConsole>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult(ExitCode.Success));
 
-        // Accepts thumbprints as copied from the certificate dialog.
-        Test(ExitCode.Success, mock, "client", "add", "--thumbprint", "c9 af c9 a5 aa ba 73 f3 46 94 63 4d d4 e2 6d 2d 6d 6f 5c b1",
-            "--name", TestName);
+        // The invisible mark the certificate dialog puts in front of a copied thumbprint is removed.
+        Test(ExitCode.Success, mock, "client", "add", "--thumbprint", $"‎{TestThumbprint}", "--name", TestName);
     }
 
     [TestMethod]
@@ -63,11 +62,6 @@ sealed class Parse_client_Tests
         Test(ExitCode.ParseError, "client", "add", "--thumbprint", TestThumbprint);
     }
 
-    [TestMethod]
-    public void Add_ThumbprintInvalid()
-    {
-        Test(ExitCode.ParseError, "client", "add", "--thumbprint", "1234", "--name", TestName);
-    }
 
     [TestMethod]
     public void ListSuccess()

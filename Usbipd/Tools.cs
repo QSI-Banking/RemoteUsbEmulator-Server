@@ -111,7 +111,8 @@ static class Tools
     public static void ThrowWin32Error(string function)
     {
         var error = Marshal.GetLastPInvokeError();
-        throw new Win32Exception(error, $"{function}: {(WIN32_ERROR)error} ({error}): {Marshal.GetPInvokeErrorMessage(error)}");
+        // unchecked: some APIs leave an HRESULT (negative as int) as the last error, which a checked cast would turn into an OverflowException.
+        throw new Win32Exception(error, $"{function}: {(WIN32_ERROR)unchecked((uint)error)} ({error}): {Marshal.GetPInvokeErrorMessage(error)}");
     }
 
     public static void ThrowOnWin32Error([DoesNotReturnIf(false)] this BOOL success, string function)

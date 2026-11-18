@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.Data.Common;
+using System.Runtime.InteropServices;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -64,8 +66,16 @@ sealed class ImpersonatingConnectionInterceptor : DbConnectionInterceptor
 {
     public static readonly ImpersonatingConnectionInterceptor Instance = new();
 
+    /// <summary>
+    /// SqlClient's native network library is unpacked from qsiusbd.exe into the Windows user's temp folder. It is loaded
+    /// here, before impersonating, because the administrator who signed in may be another account that cannot read that folder.
+    /// </summary>
+    static readonly bool SqlClientNativeLibraryLoaded =
+        NativeLibrary.TryLoad("Microsoft.Data.SqlClient.SNI.dll", typeof(SqlConnection).Assembly, null, out _);
+
     public override InterceptionResult ConnectionOpening(DbConnection connection, ConnectionEventData eventData, InterceptionResult result)
     {
+        _ = SqlClientNativeLibraryLoaded;
         AdminAuthorization.RunAsAdministrator(connection.Open);
         return InterceptionResult.Suppress();
     }
