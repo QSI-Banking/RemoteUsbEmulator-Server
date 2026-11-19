@@ -798,7 +798,7 @@ static class Program
             //  admin
             //
             var adminCommand = new Command("admin", "Run several commands after one sign-in\0" + $"""
-                Every change asks for the credentials of a local administrator. An admin session asks once, \
+                Every change asks for the credentials of a member of the group set in {AdminAuthorization.GroupKey}. An admin session asks once, \
                 then runs the commands you type until 'exit'. It locks after \
                 {(int)AdminAuthorization.SessionIdleTimeout.TotalMinutes} minutes without a command, \
                 and after {(int)AdminAuthorization.SessionMaxDuration.TotalMinutes} minutes in total.
@@ -862,6 +862,7 @@ static class Program
                 //
                 //  installer configure [--port <PORT>] [--server-certificate <THUMBPRINT>] [--client-ca <THUMBPRINTS>] [--session-max-minutes <MINUTES>]
                 //                      [--sql-server <SERVER>] [--sql-database <NAME>] [--sql-trust-server-certificate <1|0>]
+                //                      [--admin-group <GROUP>]
                 //
                 var portOption = new Option<string>("--port")
                 {
@@ -891,6 +892,10 @@ static class Program
                 {
                     Description = "1 to trust the SQL Server certificate without validation (development only)",
                 };
+                var adminGroupOption = new Option<string>("--admin-group")
+                {
+                    Description = "Windows group whose members may make changes (local, or DOMAIN\\group)",
+                };
                 var configureCommand = new Command("configure")
                 {
                     portOption,
@@ -900,11 +905,12 @@ static class Program
                     sqlServerOption,
                     sqlDatabaseOption,
                     sqlTrustOption,
+                    adminGroupOption,
                 };
                 configureCommand.SetAction(parseResult => (int)InstallerTlsConfiguration.Configure(console,
                     parseResult.GetValue(portOption), parseResult.GetValue(serverCertificateOption), parseResult.GetValue(clientCaOption),
                     parseResult.GetValue(sessionMaxMinutesOption), parseResult.GetValue(sqlServerOption),
-                    parseResult.GetValue(sqlDatabaseOption), parseResult.GetValue(sqlTrustOption)));
+                    parseResult.GetValue(sqlDatabaseOption), parseResult.GetValue(sqlTrustOption), parseResult.GetValue(adminGroupOption)));
                 installCommand.Subcommands.Add(configureCommand);
             }
 

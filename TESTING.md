@@ -17,6 +17,8 @@ Run it before a release and after changes to the area a section covers.
 - **Client**: a second PC or a Hyper-V VM with test signing on, the client installer, a client certificate.
   From a Hyper-V VM, the server address is `<host computer name>.mshome.net`.
 - **Users**: two test users, each mapped to one of the two devices and enrolled in an authenticator app.
+- **Administrators group**: a local group (for example `QSI USB Operators`) with one Windows account that is not a local
+  administrator; its name is entered in the installer. A local administrator outside the group for the refusal tests.
 - The server log is in Event Viewer: Applications and Services Logs > qsiusbd > Operational. For debug detail, run
   `Stop-Service qsiusbd; qsiusbd server` in an elevated console instead (Ctrl+C, then `Start-Service qsiusbd`).
 - Run server commands in an elevated window.
@@ -27,7 +29,7 @@ Each test: **steps**, then the **expected** result. A test fails if anything els
 
 | # | Steps | Expected |
 |---|---|---|
-| 1.1 | Install the server MSI interactively; fill in the TLS and database pages | Service `qsiusbd` running; `appsettings.json` has the values; firewall rule for the port |
+| 1.1 | Install the server MSI interactively; fill in the TLS and database pages, including the administrators group | Service `qsiusbd` running; `appsettings.json` has the values, including `qsiusbd:Admin:Group`; firewall rule for the port |
 | 1.2 | Install the server MSI silently with all properties | Same as 1.1 |
 | 1.3 | `qsiusbd db migrate` twice | Applies migrations, then reports the schema is up to date; roles exist both times |
 | 1.4 | Set a wrong server certificate thumbprint in `appsettings.json`, restart the service | Service does not start; the event log names the setting |
@@ -128,8 +130,8 @@ $all = 1..101 | ForEach-Object { try { Open-Idle } catch { "refused: $_" } }; $a
 
 | # | Steps | Expected |
 |---|---|---|
-| 7.1 | In an elevated window: `qsiusbd client disable` | Windows sign-in dialog; works after an administrator signs in |
-| 7.2 | Cancel the dialog; wrong password 3 times; a non-administrator account | Refused each time; nothing changed |
+| 7.1 | In an elevated window: `qsiusbd client disable`; sign in as a member of the administrators group who is not a local administrator | Windows sign-in dialog names the group; the change works |
+| 7.2 | Cancel the dialog; wrong password 3 times; a local administrator who is not in the group | Refused each time ("is not a member of"); nothing changed |
 | 7.3 | `qsiusbd list`, `user list`, `client list` | No dialog |
 | 7.4 | `qsiusbd admin`, several changes | One dialog; `lock` signs out; `exit` ends |
 | 7.5 | In `qsiusbd admin`: `client add --certificate "C:\path with spaces\pc.cer" --name "Lab PC"` | Works; quotes group the words, backslashes are kept |
@@ -137,6 +139,8 @@ $all = 1..101 | ForEach-Object { try { Open-Idle } catch { "refused: $_" } }; $a
 | 7.7 | `SELECT TOP 10 * FROM usbipd.AdminAudit ORDER BY Id DESC` | Every change, with the account that signed in |
 | 7.8 | Not elevated: any change | "Access denied" before any dialog |
 | 7.9 | `qsiusbd client disable --thumbprint <thumbprint pasted from the certificate dialog>` | Finds the certificate |
+| 7.10 | Empty `qsiusbd:Admin:Group` in `appsettings.json`; then a group name that does not exist; make a change | Refused before any dialog, with a message naming the setting or the group |
+| 7.11 | `bind --busid <busid>` in an elevated window, signed in as the group member from 7.1 | Device bound; the audit names the group member |
 
 ## 8. OTP enrollment and secrets
 

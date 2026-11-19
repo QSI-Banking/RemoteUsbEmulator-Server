@@ -26,6 +26,7 @@ public static class CustomActions
     const string SqlServerProperty = "SQL_SERVER";
     const string SqlDatabaseProperty = "SQL_DATABASE";
     const string SqlTrustProperty = "SQL_TRUST_SERVER_CERT";
+    const string AdminGroupProperty = "ADMIN_GROUP";
     const string DefaultSqlDatabase = "usbipd";
     const string DefaultPort = "3241";
 
@@ -43,6 +44,7 @@ public static class CustomActions
         string server = null;
         string ca = null;
         string sessionMinutes = null;
+        string adminGroup = null;
         string connectionString = null;
         try
         {
@@ -56,6 +58,7 @@ public static class CustomActions
                 server = Text(Child(tls, "ServerCertificateThumbprint"));
                 ca = Text(Child(tls, "ClientCaThumbprints"));
                 sessionMinutes = Text(Child(Child(Child(root, "qsiusbd"), "Session"), "MaxDurationMinutes"));
+                adminGroup = Text(Child(Child(Child(root, "qsiusbd"), "Admin"), "Group"));
                 connectionString = Text(Child(Child(root, "ConnectionStrings"), "Usbipd"));
                 session.Log($"ReadTlsSettings: read {path}");
             }
@@ -75,6 +78,7 @@ public static class CustomActions
         SetIfEmpty(session, SqlServerProperty, sqlServer);
         SetIfEmpty(session, SqlDatabaseProperty, string.IsNullOrWhiteSpace(sqlDatabase) ? DefaultSqlDatabase : sqlDatabase);
         SetIfEmpty(session, SqlTrustProperty, sqlTrust ? "1" : null);
+        SetIfEmpty(session, AdminGroupProperty, adminGroup);
         return ActionResult.Success;
     }
 

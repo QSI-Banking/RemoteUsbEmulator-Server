@@ -14,8 +14,9 @@ using static Usbipd.AdminAuthorization.UnsafeNativeMethods;
 namespace Usbipd;
 
 /// <summary>
-/// Every change asks for an administrator's Windows credentials, so that an elevated window that was left open cannot be
-/// used by someone else. The check is valid for one command, or for an admin session ('qsiusbd admin') until it was idle for
+/// Every change asks for the Windows credentials of a member of the configured group (<see cref="GroupKey"/>), so that an
+/// elevated window that was left open cannot be used by someone else. The member does not have to be an administrator; the
+/// window itself must still be elevated (see <see cref="ConsoleTools.CheckWriteAccess"/>). The check is valid for one command, or for an admin session ('qsiusbd admin') until it was idle for
 /// <see cref="SessionIdleTimeout"/> or lasted <see cref="SessionMaxDuration"/>; a timer then discards the sign-in token from memory.
 /// Database connections of the CLI are made as the checked account
 /// (see <see cref="Data.ImpersonatingConnectionInterceptor"/>), so the audit names the person who made the change.
@@ -25,8 +26,12 @@ static partial class AdminAuthorization
     public static readonly TimeSpan SessionIdleTimeout = TimeSpan.FromMinutes(10);
     public static readonly TimeSpan SessionMaxDuration = TimeSpan.FromMinutes(60);
 
+    /// <summary>
+    /// The Windows group (local, or DOMAIN\group) whose members may make changes; set by the installer.
+    /// </summary>
+    public const string GroupKey = "qsiusbd:Admin:Group";
+
     const int MaxAttempts = 3;
-    static readonly SecurityIdentifier AdministratorsSid = new(WellKnownSidType.BuiltinAdministratorsSid, null);
     static readonly Lock Lock = new();
 
     static WindowsIdentity? Current;
@@ -77,7 +82,7 @@ static partial class AdminAuthorization
     }
 
     /// <summary>
-    /// Asks for administrator credentials unless they were checked recently in this admin session.
+    /// Asks for the credentials of a member of the configured group unless they were checked recently in this admin session.
     /// The installer runs as LocalSystem, which is not asked.
     /// </summary>
     /// <returns><see langword="false"/> if the credentials were not given or not valid (reported).</returns>
@@ -110,9 +115,13 @@ static partial class AdminAuthorization
             }
         }
 
+        if (!TryGetGroup(Data.Database.LoadConfiguration(), console, out var groupName, out var groupSid))
+        {
+            return false;
+        }
         var message = InSession
-            ? "Enter the credentials of a local administrator for this qsiusbd admin session."
-            : "Enter the credentials of a local administrator to make this change.";
+            ? $"Enter the credentials of a member of '{groupName}' for this qsiusbd admin session."
+            : $"Enter the credentials of a member of '{groupName}' to make this change.";
         uint authError = 0;
         for (var attempt = 0; attempt < MaxAttempts; ++attempt)
         {
@@ -131,9 +140,9 @@ static partial class AdminAuthorization
                 }
                 using (token)
                 {
-                    if (!IsAdministrator(token))
+                    if (!IsMember(token, groupSid))
                     {
-                        console.ReportError($"'{domain}\\{userName}' is not a member of the local Administrators group.");
+                        console.ReportError($"'{domain}\\{userName}' is not a member of '{groupName}'.");
                         authError = ERROR_ACCESS_DENIED;
                         continue;
                     }
@@ -255,13 +264,38 @@ static partial class AdminAuthorization
     }
 
     /// <summary>
-    /// With UAC, the Administrators group is deny-only in an administrator's token; the account is still a member.
+    /// The configured group. Without a group that exists, every change is refused: there is no fallback.
     /// </summary>
-    static bool IsAdministrator(SafeAccessTokenHandle token)
+    internal static bool TryGetGroup(IConfiguration configuration, IConsole console, out string groupName, out SecurityIdentifier groupSid)
+    {
+        groupName = configuration[GroupKey]?.Trim() ?? string.Empty;
+        groupSid = null!;
+        if (groupName.Length == 0)
+        {
+            console.ReportError($"No group is allowed to make changes: set {GroupKey} in appsettings.json next to qsiusbd.exe.");
+            return false;
+        }
+        try
+        {
+            groupSid = (SecurityIdentifier)new NTAccount(groupName).Translate(typeof(SecurityIdentifier));
+            return true;
+        }
+        catch (IdentityNotMappedException)
+        {
+            console.ReportError($"The group '{groupName}' ({GroupKey}) does not exist.");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Groups nested in the configured group count too: the sign-in token lists them all. A group that UAC made deny-only
+    /// (for an administrator) still counts as membership.
+    /// </summary>
+    static bool IsMember(SafeAccessTokenHandle token, SecurityIdentifier groupSid)
     {
         using var identity = new WindowsIdentity(token.DangerousGetHandle());
         return identity.Claims.Any(claim => (claim.Type is ClaimTypes.GroupSid or ClaimTypes.DenyOnlySid)
-            && claim.Value == AdministratorsSid.Value);
+            && claim.Value == groupSid.Value);
     }
 
     static unsafe bool PromptForCredentials(IConsole console, string message, uint authError, out string userName, out string domain,
@@ -286,7 +320,7 @@ static partial class AdminAuthorization
                 &save, CREDUIWIN_GENERIC);
             if (result == ERROR_CANCELLED)
             {
-                console.ReportError("Canceled; the change requires the credentials of a local administrator.");
+                console.ReportError("Canceled; the change requires the credentials of a member of the configured group.");
                 return false;
             }
             if (result != 0)

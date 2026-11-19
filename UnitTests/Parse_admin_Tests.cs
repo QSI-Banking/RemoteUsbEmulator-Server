@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.CommandLine.Parsing;
+using Microsoft.Extensions.Configuration;
 
 namespace UnitTests;
 
@@ -45,6 +46,27 @@ sealed class Parse_admin_Tests
         CollectionAssert.AreEqual(ExpectedEmpty,
             CommandLineParser.SplitCommandLine(@"user add --name """"").ToList());
         Assert.IsEmpty(CommandLineParser.SplitCommandLine("   ").ToList());
+    }
+
+    static IConfiguration GroupConfiguration(string? group) => new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?> { [AdminAuthorization.GroupKey] = group }).Build();
+
+    [TestMethod]
+    [DataRow(null)]
+    [DataRow("")]
+    [DataRow("QSIUSBD unit test group that does not exist")]
+    public void Group_MissingOrUnknown_Refused(string? group)
+    {
+        Assert.IsFalse(AdminAuthorization.TryGetGroup(GroupConfiguration(group), new TestConsole(), out _, out _));
+    }
+
+    [TestMethod]
+    public void Group_Found()
+    {
+        // A group that exists on every Windows machine.
+        Assert.IsTrue(AdminAuthorization.TryGetGroup(GroupConfiguration(@"BUILTIN\Users"), new TestConsole(), out var name, out var sid));
+        Assert.AreEqual(@"BUILTIN\Users", name);
+        Assert.AreEqual("S-1-5-32-545", sid.Value);
     }
 
     [TestMethod]

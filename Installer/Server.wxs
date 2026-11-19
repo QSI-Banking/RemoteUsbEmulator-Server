@@ -187,7 +187,7 @@ SPDX-License-Identifier: GPL-3.0-only
 
         <!--
         TLS settings, chosen in the TLS dialog or passed on the command line (silent install):
-            msiexec /i QSIUSBD.msi /qn TLS_PORT=3241 TLS_SERVER_CERT=<thumbprint> TLS_CLIENT_CA=<thumbprint>[,<thumbprint>...] SESSION_MAX_MINUTES=10 SQL_SERVER=sqlprod01 SQL_DATABASE=qsiusbd [SQL_TRUST_SERVER_CERT=1]
+            msiexec /i QSIUSBD.msi /qn TLS_PORT=3241 TLS_SERVER_CERT=<thumbprint> TLS_CLIENT_CA=<thumbprint>[,<thumbprint>...] SESSION_MAX_MINUTES=10 SQL_SERVER=sqlprod01 SQL_DATABASE=usbipd [SQL_TRUST_SERVER_CERT=1] ADMIN_GROUP="CORP\QSI USB Operators"
         Values that are not passed are read from the existing appsettings.json (ReadTlsSettings), so a silent upgrade keeps them.
         'qsiusbd installer configure' writes and validates appsettings.json; an invalid choice fails (and rolls back) the installation.
         -->
@@ -203,6 +203,8 @@ SPDX-License-Identifier: GPL-3.0-only
         <Property Id="SQL_DATABASE" Secure="yes" />
         <!-- 1 = trust the SQL Server certificate without validation (development only) -->
         <Property Id="SQL_TRUST_SERVER_CERT" Secure="yes" />
+        <!-- Windows group whose members may make changes with qsiusbd (qsiusbd:Admin:Group); created by the network administrator -->
+        <Property Id="ADMIN_GROUP" Secure="yes" />
 
         <Binary Id="UsbipdTlsCA" SourceFile="$(var.Usbipd.InstallerActions.TargetDir)Usbipd.InstallerActions.CA.dll" />
         <CustomAction Id="ReadTlsSettings" BinaryRef="UsbipdTlsCA" DllEntry="ReadTlsSettings" Execute="immediate" Return="check" />
@@ -213,6 +215,8 @@ SPDX-License-Identifier: GPL-3.0-only
         <CustomAction Id="ConfigureTls" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixQuietExec" Return="check" Impersonate="no" Execute="deferred" />
         <SetProperty Id="ConfigureDatabase" Value="&quot;[#qsiusbd.exe]&quot; installer configure --sql-server &quot;[SQL_SERVER]&quot; --sql-database &quot;[SQL_DATABASE]&quot; --sql-trust-server-certificate &quot;[SQL_TRUST_SERVER_CERT]&quot;" Sequence="execute" Before="ConfigureDatabase" Condition="$(var.InstallOrUpdateOrRepair)" />
         <CustomAction Id="ConfigureDatabase" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixQuietExec" Return="check" Impersonate="no" Execute="deferred" />
+        <SetProperty Id="ConfigureAdminGroup" Value="&quot;[#qsiusbd.exe]&quot; installer configure --admin-group &quot;[ADMIN_GROUP]&quot;" Sequence="execute" Before="ConfigureAdminGroup" Condition="$(var.InstallOrUpdateOrRepair)" />
+        <CustomAction Id="ConfigureAdminGroup" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixQuietExec" Return="check" Impersonate="no" Execute="deferred" />
 
         <InstallUISequence>
             <Custom Action="ReadTlsSettings" After="CostFinalize" />
@@ -236,7 +240,8 @@ SPDX-License-Identifier: GPL-3.0-only
 
             <!-- before the service is started, which reads appsettings.json -->
             <Custom Action="ConfigureTls" Before="ConfigureDatabase" Condition="$(var.InstallOrUpdateOrRepair)" />
-            <Custom Action="ConfigureDatabase" Before="TryStartService" Condition="$(var.InstallOrUpdateOrRepair)" />
+            <Custom Action="ConfigureDatabase" Before="ConfigureAdminGroup" Condition="$(var.InstallOrUpdateOrRepair)" />
+            <Custom Action="ConfigureAdminGroup" Before="TryStartService" Condition="$(var.InstallOrUpdateOrRepair)" />
             <Custom Action="TryStartService" After="StartServices" Condition="$(var.InstallOrUpdateOrRepair)" />
             <Custom Action="UpdateDrivers" After="StartServices" Condition="$(var.InstallOrUpdateOrRepair)" />
             <Custom Action="UninstallOldDrivers2" After="StartServices" Condition="$(var.InstallOrUpdateOrRepair)" />

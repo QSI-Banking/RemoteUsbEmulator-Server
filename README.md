@@ -82,25 +82,30 @@ Run `QSIUSBD_<version>_x64.msi` as an administrator. Its pages:
 | | Server certificate | From Local Computer > Personal, with private key. |
 | | Client certificate CA | The CA that issues client certificates. |
 | Database | SQL Server, Database | For example `.\SQLEXPRESS` and `usbipd`. |
+| | Administrators group | The existing Windows group whose members may make changes, for example `CORP\QSI USB Operators`. The network administrator creates it. |
 | | Trust the SQL Server certificate | Development only. |
 
-Silent install: `msiexec /i QSIUSBD_<version>_x64.msi /qn TLS_PORT=3241 TLS_SERVER_CERT=<thumbprint> TLS_CLIENT_CA=<thumbprint> SESSION_MAX_MINUTES=10 SQL_SERVER=.\SQLEXPRESS SQL_DATABASE=qsiusbd SQL_TRUST_SERVER_CERT=0`
+Silent install: `msiexec /i QSIUSBD_<version>_x64.msi /qn TLS_PORT=3241 TLS_SERVER_CERT=<thumbprint> TLS_CLIENT_CA=<thumbprint> SESSION_MAX_MINUTES=10 SQL_SERVER=.\SQLEXPRESS SQL_DATABASE=usbipd SQL_TRUST_SERVER_CERT=0 ADMIN_GROUP="CORP\QSI USB Operators"`
 
 To change settings later, edit `appsettings.json` and restart the service, or uninstall and install again.
 
 ## Initial setup
 
-Run these in an elevated PowerShell. Every command that changes something shows a Windows sign-in dialog for a
-local administrator; `qsiusbd admin` signs in once for several commands.
+Run these in an elevated PowerShell. Every command that changes something shows a Windows sign-in dialog for a member
+of the administrators group (`qsiusbd:Admin:Group`); that account does not have to be a local administrator.
+`qsiusbd admin` signs in once for several commands.
 
 1. **Create the database**, as an account that may change the schema:
    `qsiusbd db migrate`
 2. **Give SQL access**, in SQL Server (for example with `sqlcmd`):
    ```sql
    ALTER ROLE usbipd_service ADD MEMBER [NT AUTHORITY\SYSTEM];   -- or [DOMAIN\SERVER$] for a remote SQL Server
-   ALTER ROLE usbipd_admin ADD MEMBER [DOMAIN\usbipd-admins];    -- the administrators who run qsiusbd
+   CREATE LOGIN [CORP\QSI USB Operators] FROM WINDOWS;            -- the administrators group
+   CREATE USER [CORP\QSI USB Operators] FOR LOGIN [CORP\QSI USB Operators];
+   ALTER ROLE usbipd_admin ADD MEMBER [CORP\QSI USB Operators];
    ```
-   Grant `usbipd_admin` to the administrators' accounts or groups directly, not through `BUILTIN\Administrators`.
+   The members sign in with an interactive logon, so they need "Allow log on locally" on the server (ordinary users
+   have it by default on member servers; security policies may remove it).
 3. **Allow the client certificates**:
    `qsiusbd client add --certificate C:\certs\pc42.cer --name PC42` (or `--thumbprint <SHA-1>`)
 4. **Share devices**: `qsiusbd list`, then `qsiusbd bind --busid <BUSID>`.
@@ -152,8 +157,9 @@ Device states in `qsiusbd list`:
 - **Binds** are valid only while the service watches the device without a break: any unplug, move or re-enumeration
   drops the bind, every service start requires a review, and every attach checks the device against what was recorded
   at bind time (port and a fingerprint of its USB descriptors).
-- **Administration** requires a local administrator's sign-in for every change, also in an elevated window. The
-  database connection runs as that person, and every change is written to `usbipd.AdminAudit`.
+- **Administration** requires an elevated window and, for every change, a sign-in by a member of the administrators
+  group (`qsiusbd:Admin:Group`). Without that setting, or if the group does not exist, every change is refused. The
+  database connection runs as the person who signed in, and every change is written to `usbipd.AdminAudit`.
 - **OTP secrets** are encrypted with the ConfigEncrypt library's RSA certificate format (stored as `enc:` + Base64;
   AES-256-GCM, key wrapped with the certificate's RSA key) to the TLS server certificate, or to
   `qsiusbd:Otp:CertificateThumbprint`. Administrators encrypt with the public key; only the
@@ -198,6 +204,7 @@ For debug detail as well, stop the service and run it in an elevated console:
 | Key | Default | Meaning |
 |---|---|---|
 | `ConnectionStrings:Usbipd` | | SQL Server connection string (Windows authentication) |
+| `qsiusbd:Admin:Group` | | Windows group (local, or `DOMAIN\group`) whose members may make changes; set by the installer |
 | `qsiusbd:Tls:Port` | 3241 | TLS port |
 | `qsiusbd:Tls:ListenAddress` | all | Listen on one local address only |
 | `qsiusbd:Tls:ServerCertificateThumbprint` | | Server certificate in Local Computer > Personal |

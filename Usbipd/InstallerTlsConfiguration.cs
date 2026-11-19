@@ -22,7 +22,7 @@ static class InstallerTlsConfiguration
     static string SettingsPath => Path.Combine(AppContext.BaseDirectory, "appsettings.json");
 
     public static ExitCode Configure(IConsole console, string? port, string? serverCertificate, string? clientCertificateAuthorities,
-        string? sessionMaxMinutes, string? sqlServer, string? sqlDatabase, string? sqlTrustServerCertificate)
+        string? sessionMaxMinutes, string? sqlServer, string? sqlDatabase, string? sqlTrustServerCertificate, string? adminGroup)
     {
         try
         {
@@ -77,6 +77,11 @@ static class InstallerTlsConfiguration
                     TrustServerCertificate = sqlTrustServerCertificate?.Trim() is "1" or "true" or "True",
                 };
                 GetObject(root, "ConnectionStrings")[Data.Database.ConnectionStringName] = builder.ConnectionString;
+            }
+
+            if (!string.IsNullOrWhiteSpace(adminGroup))
+            {
+                GetObject(GetObject(root, "qsiusbd"), "Admin")["Group"] = adminGroup.Trim();
             }
 
             var json = Serialize(root);

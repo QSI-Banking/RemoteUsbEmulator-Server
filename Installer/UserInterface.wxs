@@ -388,7 +388,7 @@ SPDX-License-Identifier: GPL-3.0-only
                     />
             </Dialog>
 
-            <?define DatabaseComplete="SQL_SERVER AND SQL_DATABASE" ?>
+            <?define DatabaseComplete="SQL_SERVER AND SQL_DATABASE AND ADMIN_GROUP" ?>
 
             <!--
             SQL Server for users, devices and audit. Windows authentication only: the service connects as its account
@@ -439,18 +439,21 @@ SPDX-License-Identifier: GPL-3.0-only
                 <Control Id="DatabaseLabel" Type="Text" X="30" Y="124" Width="110" Height="13" TabSkip="yes" Text="{\Caption}&amp;Database:" />
                 <Control Id="DatabaseName" Type="Edit" X="140" Y="122" Width="200" Height="15" Property="SQL_DATABASE" />
 
-                <Control Id="Trust" Type="CheckBox" X="30" Y="146" Width="310" Height="15" Property="SQL_TRUST_SERVER_CERT" CheckBoxValue="1"
+                <Control Id="AdminGroupLabel" Type="Text" X="30" Y="144" Width="110" Height="13" TabSkip="yes" Text="{\Caption}&amp;Administrators group:" />
+                <Control Id="AdminGroup" Type="Edit" X="140" Y="142" Width="200" Height="15" Property="ADMIN_GROUP" />
+
+                <Control Id="Trust" Type="CheckBox" X="30" Y="164" Width="310" Height="15" Property="SQL_TRUST_SERVER_CERT" CheckBoxValue="1"
                     Text="{\Caption}&amp;Trust the SQL Server certificate without validation (development only)" />
 
                 <Control
-                    Id="Hint" Type="Text" X="30" Y="168" Width="310" Height="60" TabSkip="yes" NoPrefix="yes"
-                    Text="{\Caption}Example: .\SQLEXPRESS or sqlprod01. The service connects as NT AUTHORITY\SYSTEM (local SQL Server) or as this computer's domain account (remote). After installing, create the schema with: qsiusbd db migrate. Silent install: SQL_SERVER, SQL_DATABASE, SQL_TRUST_SERVER_CERT=1."
+                    Id="Hint" Type="Text" X="30" Y="184" Width="310" Height="48" TabSkip="yes" NoPrefix="yes"
+                    Text="{\Caption}Example: .\SQLEXPRESS or sqlprod01. Administrators group: the existing Windows group whose members may make changes, for example CORP\QSI USB Operators. After installing: qsiusbd db migrate. Silent install: SQL_SERVER, SQL_DATABASE, SQL_TRUST_SERVER_CERT=1, ADMIN_GROUP."
                     />
             </Dialog>
 
             <Dialog Id="DatabaseIncomplete" Width="260" Height="85" Title="$(var.WizardTitle)" NoMinimize="yes">
                 <Control Id="Text" Type="Text" X="15" Y="15" Width="230" Height="40" TabSkip="no" NoPrefix="yes"
-                    Text="{\Body}Enter the SQL Server and the database name." />
+                    Text="{\Body}Enter the SQL Server, the database name and the administrators group." />
                 <Control Id="OK" Type="PushButton" X="180" Y="58" Width="66" Height="20" Default="yes" Cancel="yes" Text="{\Caption}&amp;OK">
                     <Publish Event="EndDialog" Value="Return" />
                 </Control>

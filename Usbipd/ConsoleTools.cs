@@ -280,8 +280,8 @@ static partial class ConsoleTools
     }
 
     /// <summary>
-    /// For every change: the process must be elevated (driver changes), and an administrator must sign in
-    /// (see <see cref="AdminAuthorization"/>), also in an elevated window.
+    /// For every change: the process must be elevated (driver changes), and a member of the configured group must sign in
+    /// (see <see cref="AdminAuthorization"/>).
     /// </summary>
     public static bool CheckWriteAccess(IConsole console)
     {
